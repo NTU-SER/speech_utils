@@ -1,2 +1,9 @@
 # IPython Notebook for experimenting
 experiment.ipynb
+.ipynb_checkpoints
+
+# Cache
+__pycache__
+
+# Build
+*.egg-info
