@@ -204,7 +204,7 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
                                   initializer=tf.constant_initializer(0.1))
 
     layer1 = tf.nn.conv2d(inputs, layer1_filter, layer1_stride, padding='SAME')
-    layer1 = tf.nn.bias_add(layer1,layer1_bias)
+    layer1 = tf.nn.bias_add(layer1, layer1_bias)
     layer1 = leaky_relu(layer1, 0.01)
     layer1 = tf.nn.max_pool(
         layer1, ksize=[1, mp_fsize_h, mp_fsize_w, 1],
@@ -212,27 +212,27 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
     layer1 = tf.contrib.layers.dropout(layer1, keep_prob=dropout_keep_prob, is_training=is_training)
 
     layer2 = tf.nn.conv2d(layer1, layer2_filter, layer2_stride, padding='SAME')
-    layer2 = tf.nn.bias_add(layer2,layer2_bias)
+    layer2 = tf.nn.bias_add(layer2, layer2_bias)
     layer2 = leaky_relu(layer2, 0.01)
     layer2 = tf.contrib.layers.dropout(layer2, keep_prob=dropout_keep_prob, is_training=is_training)
 
     layer3 = tf.nn.conv2d(layer2, layer3_filter, layer3_stride, padding='SAME')
-    layer3 = tf.nn.bias_add(layer3,layer3_bias)
+    layer3 = tf.nn.bias_add(layer3, layer3_bias)
     layer3 = leaky_relu(layer3, 0.01)
     layer3 = tf.contrib.layers.dropout(layer3, keep_prob=dropout_keep_prob, is_training=is_training)
 
     layer4 = tf.nn.conv2d(layer3, layer4_filter, layer4_stride, padding='SAME')
-    layer4 = tf.nn.bias_add(layer4,layer4_bias)
+    layer4 = tf.nn.bias_add(layer4, layer4_bias)
     layer4 = leaky_relu(layer4, 0.01)
     layer4 = tf.contrib.layers.dropout(layer4, keep_prob=dropout_keep_prob, is_training=is_training)
 
     layer5 = tf.nn.conv2d(layer4, layer5_filter, layer5_stride, padding='SAME')
-    layer5 = tf.nn.bias_add(layer5,layer5_bias)
+    layer5 = tf.nn.bias_add(layer5, layer5_bias)
     layer5 = leaky_relu(layer5, 0.01)
     layer5 = tf.contrib.layers.dropout(layer5, keep_prob=dropout_keep_prob, is_training=is_training)
 
     layer6 = tf.nn.conv2d(layer5, layer6_filter, layer6_stride, padding='SAME')
-    layer6 = tf.nn.bias_add(layer6,layer6_bias)
+    layer6 = tf.nn.bias_add(layer6, layer6_bias)
     layer6 = leaky_relu(layer6, 0.01)
     layer6 = tf.contrib.layers.dropout(layer6, keep_prob=dropout_keep_prob, is_training=is_training)
 
@@ -240,7 +240,7 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
     layer6 = tf.reshape(layer6, [-1, p * num_filters_2])
 
     linear1 = tf.matmul(layer6, linear1_weight) + linear1_bias
-    linear1 = batch_norm_wrapper(linear1,is_training)
+    linear1 = batch_norm_wrapper(linear1, is_training)
     linear1 = leaky_relu(linear1, 0.01)
     linear1 = tf.reshape(linear1, [-1, time_step, num_linear_units])
 
