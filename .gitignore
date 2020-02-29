@@ -3,7 +3,13 @@ experiment.ipynb
 .ipynb_checkpoints
 
 # Cache
-__pycache__
+**/__pycache__
 
 # Build
 *.egg-info
+
+# Checkpoints
+*.ckpt*
+
+# Data
+data
