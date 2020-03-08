@@ -14,7 +14,7 @@ import numpy as np
 import tensorflow as tf
 
 # from acrnn1 import acrnn
-from speech_utils.ARCNN.model_utils import acrnn, CB_loss_tf
+from speech_utils.ACRNN.model_utils import acrnn, CB_loss_tf
 
 import pickle as cPickle
 from sklearn.metrics import recall_score as recall
@@ -80,7 +80,7 @@ def train():
 
     # *************************************************************************
     use_CBL = True
-    beta = 0.9999
+    beta = 0.999
     if not use_CBL:
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
             labels=Y, logits=logits)

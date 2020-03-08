@@ -3,7 +3,7 @@ import pickle
 from tensorflow.compat.v1 import ConfigProto, InteractiveSession
 import tensorflow as tf
 
-from speech_utils.ARCNN.model_utils import train
+from speech_utils.ACRNN.model_utils import train
 
 config = ConfigProto(log_device_placement=True)
 config.gpu_options.allow_growth = True
@@ -19,7 +19,7 @@ def main():
     random_seed = None
     use_CBL = True
     # Load data
-    data_path = "../data/ARCNN/features.pkl"
+    data_path = "../data/ACRNN/features.pkl"
     with open(data_path, "rb") as fin:
         data = pickle.load(fin)
     # Train
