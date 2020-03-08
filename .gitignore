@@ -9,6 +9,7 @@ experiment.ipynb
 *.egg-info
 
 # Checkpoints
+**/checkpoint
 *.ckpt*
 
 # Data
