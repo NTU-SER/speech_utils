@@ -360,8 +360,3 @@ def extract_mel(dataset_dir, num_filters, emot_map, metadata,
         with open(save_path, "wb") as fout:
             pickle.dump(ans, fout)
     return ans
-
-
-"""
-These below functions are for PyTorch version of 3D-ACRNN ARCNN
-"""

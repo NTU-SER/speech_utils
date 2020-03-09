@@ -10,7 +10,8 @@ from sklearn.metrics import confusion_matrix as confusion
 def attention(inputs, attention_size, time_major=False, return_alphas=False):
     """
     Adapted from https://github.com/xuanjihe/speech-emotion-recognition/blob/master/attention.py
-    Note that the author has changed the activation function of the fully connected layer from tanh to sigmoid.
+    Note that the author has changed the activation function of the fully
+    connected layer from tanh to sigmoid.
 
     Attention mechanism layer which reduces RNN/Bi-RNN outputs with Attention vector.
 
@@ -117,8 +118,18 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
           num_filters_1=128, num_filters_2=256, mp_fsize=(2, 4),
           num_lstm_units=128, num_linear_units=768, num_fcn_units=64):
     """
-    Adapted from https://github.com/xuanjihe/speech-emotion-recognition/blob/master/acrnn1.py
-    3D-CRNN model wrapper. Take `inputs` as model input and return the model logits.
+    Reference: "3-D Convolutional Recurrent Neural Networks with Attention Model
+    for Speech Emotion Recognition"
+    Authors: Chen Mingyi and
+             He Xuanji and
+             Yang Jing and
+             Zhang Han.
+
+    Adapted from
+    https://github.com/xuanjihe/speech-emotion-recognition/blob/master/acrnn1.py
+
+    3D-CRNN model wrapper with Tensorflow. Take `inputs` as model input and
+    return the model logits.
 
     Parameters
     ----------
@@ -331,9 +342,10 @@ def CB_loss_tf(labels, logits, samples_per_cls, beta=0.9999, is_training=True):
 def train(data, epochs, batch_size, learning_rate, shuffle=True,
           random_seed=123, test_every=10, num_classes=4,
           use_adam=True, dropout_keep_prob=1, save_path=None,
-          use_CBL=False, beta=0.9999,
-          *args, **kwargs):
-    """Short summary.
+          use_CBL=False, beta=0.9999, *args, **kwargs):
+    """
+    Train a 3D-CRNN (3D - Convolutional Recurrent Neural Networks) model with
+    Tensorflow version.
 
     Parameters
     -------
