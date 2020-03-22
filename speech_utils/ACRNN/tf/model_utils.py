@@ -339,20 +339,37 @@ def CB_loss_tf(labels, logits, samples_per_cls, beta=0.9999, is_training=True):
     return loss
 
 
-def train(data, epochs, batch_size, learning_rate, shuffle=True,
-          random_seed=123, test_every=10, num_classes=4,
-          use_adam=True, dropout_keep_prob=1, save_path=None,
-          use_CBL=False, beta=0.9999, *args, **kwargs):
-    """
-    Train a 3D-CRNN (3D - Convolutional Recurrent Neural Networks) model with
-    Tensorflow version.
+def train(data, epochs, batch_size, learning_rate, test_every=10,
+          random_seed=123, num_classes=4, grad_clip=False, dropout_keep_prob=1,
+          save_path=None, use_CBL=False, beta=0.9999, *args, **kwargs):
+    """Short summary.
 
     Parameters
-    -------
-    use_CBL : bool
+    ----------
+    data : tuple
+        Data extracted using speech_utils.ACRNN.data_utils.extract_mel
+    epochs : int
+        Number of epochs.
+    batch_size : int
+    learning_rate : float
+    test_every : int
+        Number of batches between each test.
+    random_seed : int
+        Random seed for reproducibility.
+    num_classes : int
+        Number of classes.
+    grad_clip : boolean
+        Whether to clip gradients of Adam optimizer.
+    dropout_keep_prob : float
+        The probability of keeping a connection in dropout.
+    save_path : str
+        Path to save the best models.
+    use_CBL : boolean
         Whether to use Class Balanced Loss.
     beta : float
-        Hyperparameter for Class Balanced Loss.
+        Hyperparameter for Class Balanced Loss. Default: 0.9999
+    **kwargs
+        Custom keyword arguments to pass to the ACRNN constructor.
 
     """
     # For reproducibility
@@ -370,7 +387,6 @@ def train(data, epochs, batch_size, learning_rate, shuffle=True,
     num_val_segs = val_segs_labels.shape[0]
     # Best unweighted accuracy on validation set
     best_valid_ua = 0
-
     # Construct model
     X = tf.placeholder(
         tf.float32, shape=[None, image_height, image_width, image_channel])
@@ -381,7 +397,7 @@ def train(data, epochs, batch_size, learning_rate, shuffle=True,
     keep_prob = tf.placeholder(tf.float32)
     # Cost
     logits = acrnn(X, is_training=is_training,
-                   dropout_keep_prob=keep_prob, *args, **kwargs)
+                   dropout_keep_prob=keep_prob, **kwargs)
     if not use_CBL:
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
             labels=Y, logits=logits)
@@ -397,7 +413,7 @@ def train(data, epochs, batch_size, learning_rate, shuffle=True,
 
     var_trainable_op = tf.trainable_variables()
     # Optimizer
-    if use_adam:
+    if not grad_clip:
         # Do not apply gradient clipping
         train_op = tf.train.AdamOptimizer(lr).minimize(cost)
     else:
@@ -413,19 +429,15 @@ def train(data, epochs, batch_size, learning_rate, shuffle=True,
 
     # Start training
     idxs = np.arange(num_train, dtype=np.int8) # indices for training data
+    num_batches = math.ceil(num_train / batch_size) # number of batches in each epoch
     with tf.Session() as sess:
         sess.run(init)
         for epoch in range(epochs):
-            # Shuffle at the beginning of each epoch
-            if shuffle:
-                np.random.shuffle(idxs)
-
-            num_batches = math.ceil(num_train / batch_size)
             for batch in range(num_batches):
                 idxs_batch = idxs[batch * batch_size:(batch + 1) * batch_size]
                 train_data_batch = train_data[idxs_batch]
                 train_labels_batch = train_labels[idxs_batch]
-
+                # Foward
                 _, cost_train, acc = sess.run(
                     [train_op, cost, accuracy],
                     feed_dict={X: train_data_batch, Y: train_labels_batch,
