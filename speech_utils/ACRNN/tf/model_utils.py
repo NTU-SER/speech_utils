@@ -74,10 +74,14 @@ def attention(inputs, attention_size, time_major=False, return_alphas=False):
     hidden_size = inputs.shape[2].value  # D value - hidden size of RNN layer
 
     # Trainable parameters
-    W_omega = tf.Variable(
-        tf.random_normal([hidden_size, attention_size], stddev=0.1))
-    b_omega = tf.Variable(tf.random_normal([attention_size], stddev=0.1))
-    u_omega = tf.Variable(tf.random_normal([attention_size], stddev=0.1))
+    with tf.variable_scope("attention"):
+        W_omega = tf.Variable(
+            tf.random_normal([hidden_size, attention_size], stddev=0.1),
+            name="weight")
+        b_omega = tf.Variable(
+            tf.random_normal([attention_size], stddev=0.1), name="bias")
+        u_omega = tf.Variable(
+            tf.random_normal([attention_size], stddev=0.1), name="u")
 
     # Applying fully connected layer with non-linear activation to each of
     # the B*T timestamps; the shape of `v` is (B,T,D)*(D,A)=(B,T,A),
@@ -103,11 +107,13 @@ def leaky_relu(x, leakiness=0.0):
 
 
 def batch_norm_wrapper(inputs, is_training, decay=0.999, epsilon=1e-3):
-
-    scale = tf.Variable(tf.ones([inputs.get_shape()[-1]]))
-    beta = tf.Variable(tf.zeros([inputs.get_shape()[-1]]))
-    pop_mean = tf.Variable(tf.zeros([inputs.get_shape()[-1]]), trainable=False)
-    pop_var = tf.Variable(tf.ones([inputs.get_shape()[-1]]), trainable=False)
+    with tf.variable_scope("batch_norm"):
+        scale = tf.Variable(tf.ones([inputs.get_shape()[-1]]), name="scale")
+        beta = tf.Variable(tf.zeros([inputs.get_shape()[-1]]), name="beta")
+        pop_mean = tf.Variable(tf.zeros([inputs.get_shape()[-1]]),
+                               name="mean", trainable=False)
+        pop_var = tf.Variable(tf.ones([inputs.get_shape()[-1]]),
+                              name="var", trainable=False)
 
     if is_training is not None:
         batch_mean, batch_var = tf.nn.moments(inputs, [0])
@@ -300,7 +306,7 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
     # output.
     outputs1, output_states1 = tf.nn.bidirectional_dynamic_rnn(
         cell_fw=gru_fw_cell1, cell_bw=gru_bw_cell1, inputs=linear1,
-        dtype=tf.float32, time_major=False, scope='LSTM1')
+        dtype=tf.float32, time_major=False, scope='LSTM')
 
     # Attention layer
     gru, alphas = attention(outputs1, 1, return_alphas=True)
