@@ -583,11 +583,11 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
                 print()
                 print("Valid cost: {:.04f}".format(val_cost))
                 print("Valid UA: {:.02f}%".format(val_ua * 100))
-                print('Valid confusion matrix:\n["ang","sad","hap","neu"]')
+                print('Valid confusion matrix:')
                 print(val_conf)
                 print()
                 print("Best valid UA: {:.02f}%".format(best_val_ua * 100))
-                print('Best valid confusion matrix:\n["ang","sad","hap","neu"]')
+                print('Best valid confusion matrix:')
                 print(best_val_conf)
                 print("*" * 30)
 

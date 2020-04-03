@@ -71,7 +71,7 @@ def parse_arguments(argv):
         help='Whether to test on test data at the end of training process.')
     parser.add_argument('--validate_every', type=int, default=10,
         help='Number of batches between each test.')
-    parser.add_argument('--seed', type=int, default=123,
+    parser.add_argument('--seed', type=int, default=None,
         help='Random seed for reproducibility.')
 
     return parser.parse_args(argv)
