@@ -315,11 +315,13 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
     fully1 = leaky_relu(fully1, 0.01)
     fully1 = tf.nn.dropout(fully1, dropout_keep_prob)
 
-    logits = tf.matmul(fully1, fully2_weight) + fully2_bias
+    logits = tf.add(
+        tf.matmul(fully1, fully2_weight), fully2_bias, name="logits")
     return logits
 
 
-def CB_loss_tf(labels, logits, samples_per_cls, beta=0.9999, is_training=True):
+def CB_loss_tf(labels, logits, samples_per_cls, beta=0.9999, is_training=True,
+               name=None):
     """
     Reference: "Class-Balanced Loss Based on Effective Number of Samples"
     Authors: Yin Cui and
@@ -372,18 +374,91 @@ def CB_loss_tf(labels, logits, samples_per_cls, beta=0.9999, is_training=True):
     if is_training:
         loss = tf.losses.log_loss(
             labels=labels, predictions=softmax, weights=weights)
+        loss = tf.identity(loss, name=name)
     else:
         loss = tf.losses.log_loss(
             labels=labels, predictions=softmax, weights=weights,
             reduction=tf.losses.Reduction.NONE)
-        loss = tf.reduce_sum(loss, axis=-1)
+        loss = tf.reduce_sum(loss, axis=-1, name=name)
 
     return loss
 
 
+def test(test_data, test_labels, test_segs_labels, test_segs, sess,
+         num_classes=4, batch_size=64):
+    """Short summary.
+
+    Parameters
+    ----------
+    test_data: ndarray
+    test_labels: ndarray
+    test_segs_labels: ndarray
+    test_segs: ndarray
+        The first four arguments are the data in order obtained using the
+        script `extract_mel.py`.
+    num_classes : int
+        Number of classes.
+    batch_size : int
+
+    Returns
+    -------
+    test_cost : float
+        The cost value of the model on the test data.
+    test_ua : float
+        The unweighted accuracy of the model on the test data.
+    test_conf : float
+        The confusion matrix of the model on the test data.
+    """
+    # Parameters
+    num_test = test_segs.shape[0]
+    num_test_segs = test_data.shape[0]
+    # Store predictions
+    y_test_segs = np.empty(
+        (num_test_segs, num_classes), dtype=np.float32)
+    y_test = np.empty((num_test, num_classes), dtype=np.float32)
+
+    test_cost = 0
+    if num_test_segs < batch_size:
+        loss, y_test_segs = sess.run(
+            ["cross_entropy:0", "logits:0"],
+            feed_dict={"X_input:0": test_data, "Y_input:0": test_segs_labels,
+                       "is_training:0": False, "keep_prob:0": 1}
+        )
+        test_cost = test_cost + np.sum(loss)
+
+    num_batches_test = divmod((num_test_segs), batch_size)[0]
+    for batch_test in range(num_batches_test):
+        v_begin = batch_test * batch_size
+        v_end = (batch_test + 1) * batch_size
+        if batch_test == num_batches_test - 1:
+            if v_end < num_test_segs:
+                v_end = num_test_segs
+        loss, y_test_segs[v_begin:v_end] = sess.run(
+            ["cross_entropy:0", "logits:0"],
+            feed_dict={"X_input:0": test_data[v_begin:v_end],
+                       "Y_input:0": test_segs_labels[v_begin:v_end],
+                       "is_training:0": False, "keep_prob:0": 1})
+        test_cost = test_cost + np.sum(loss)
+    test_cost = test_cost / num_test_segs
+    # Accumulate results, since each utterance might contain
+    # more than one segments
+    curr_i = 0
+    for v in range(num_test):
+        y_test[v, :] = np.max(
+            y_test_segs[curr_i:curr_i + test_segs[v]], 0)
+        curr_i = curr_i + test_segs[v]
+    # Recall and confusion matrix
+    test_ua = recall(
+        np.argmax(test_labels, 1), np.argmax(y_test, 1), average='macro')
+    test_conf = confusion(
+        np.argmax(test_labels, 1), np.argmax(y_test, 1))
+    return test_cost, test_ua, test_conf
+
+
 def train(data, epochs, batch_size, learning_rate, validate_every=10,
           random_seed=123, num_classes=4, grad_clip=False, dropout_keep_prob=1,
-          save_path=None, use_CBL=False, beta=0.9999, **kwargs):
+          save_path=None, use_CBL=False, beta=0.9999, perform_test=False,
+          **kwargs):
     """Short summary.
 
     Parameters
@@ -410,6 +485,8 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
         Whether to use Class Balanced Loss.
     beta : float
         Hyperparameter for Class Balanced Loss. Default: 0.9999
+    perform_test: bool
+        Whether to test on test data at the end of training process.
     **kwargs
         Custom keyword arguments to pass to the ACRNN constructor.
 
@@ -425,32 +502,33 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
     train_labels = to_categorical(train_labels, num_classes)
     val_labels = to_categorical(val_labels, num_classes)
     val_segs_labels = to_categorical(val_segs_labels, num_classes)
+    test_labels = to_categorical(test_labels, num_classes)
+    test_segs_labels = to_categorical(test_segs_labels, num_classes)
     # Parameters
     num_train, image_height, image_width, image_channel = train_data.shape
-    num_val = val_segs.shape[0]
-    num_val_segs = val_data.shape[0]
-    best_valid_ua = 0
+    best_val_ua = 0
     # Construct model
     X = tf.placeholder(
-        tf.float32, shape=[None, image_height, image_width, image_channel])
-    Y = tf.placeholder(tf.int32, shape=[None, num_classes])
-    is_training = tf.placeholder(tf.bool)
+        tf.float32, name="X_input",
+        shape=[None, image_height, image_width, image_channel])
+    Y = tf.placeholder(tf.int32, name="Y_input", shape=[None, num_classes])
+    is_training = tf.placeholder(tf.bool, name="is_training")
     lr = tf.placeholder(tf.float32)
-    keep_prob = tf.placeholder(tf.float32)
+    keep_prob = tf.placeholder(tf.float32, name="keep_prob")
     # Cost
     logits = acrnn(
         X, num_classes=num_classes, is_training=is_training,
         dropout_keep_prob=keep_prob, **kwargs)
     if not use_CBL:
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
-            labels=Y, logits=logits)
+            labels=Y, logits=logits, name="cross_entropy")
         cost = tf.reduce_mean(cross_entropy)
     else:
         _, samples_per_cls = np.unique(
             np.argmax(train_labels, axis=-1), return_counts=True)
         cross_entropy = CB_loss_tf(
-            labels=tf.cast(Y, "float64"), logits=logits,
-            samples_per_cls=samples_per_cls, beta=beta, is_training=False)
+            labels=tf.cast(Y, "float64"), logits=logits, is_training=False,
+            samples_per_cls=samples_per_cls, beta=beta, name="cross_entropy")
         cost = CB_loss_tf(labels=tf.cast(Y, "float64"), logits=logits,
                           samples_per_cls=samples_per_cls, beta=beta)
 
@@ -483,64 +561,44 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
                                                 feed_dict=feed_dict)
             # Test on validation set
             if i % validate_every == 0:
-                # Store predictions
-                y_val_segs = np.empty(
-                    (num_val_segs, num_classes), dtype=np.float32)
-                y_val = np.empty((num_val, 4), dtype=np.float32)
-
-                cost_valid = 0
-                if num_val_segs < batch_size:
-                    loss, y_val_segs = sess.run(
-                        [cross_entropy, logits],
-                        feed_dict={X: val_data, Y: val_segs_labels,
-                                   is_training: False, keep_prob: 1}
-                    )
-                    cost_valid = cost_valid + np.sum(loss)
-
-                num_batches_val = divmod((num_val_segs), batch_size)[0]
-                for batch_val in range(num_batches_val):
-                    v_begin = batch_val * batch_size
-                    v_end = (batch_val + 1) * batch_size
-                    if batch_val == num_batches_val - 1:
-                        if v_end < num_val_segs:
-                            v_end = num_val_segs
-                    loss, y_val_segs[v_begin:v_end] = sess.run(
-                        [cross_entropy, logits],
-                        feed_dict={X: val_data[v_begin:v_end],
-                                   Y: val_segs_labels[v_begin:v_end],
-                                   is_training: False, keep_prob: 1})
-                    cost_valid = cost_valid + np.sum(loss)
-                cost_valid = cost_valid / num_val_segs
-                # Accumulate results, since each utterance might contain
-                # more than one segments
-                curr_i = 0
-                for v in range(num_val):
-                    y_val[v, :] = np.max(
-                        y_val_segs[curr_i:curr_i + val_segs[v]], 0)
-                    curr_i = curr_i + val_segs[v]
-                # Recall and confusion matrix
-                valid_ua = recall(
-                    np.argmax(val_labels, 1), np.argmax(y_val, 1),
-                    average='macro')
-                valid_conf = confusion(
-                    np.argmax(val_labels, 1), np.argmax(y_val, 1))
+                val_cost, val_ua, val_conf = test(
+                    val_data, val_labels, val_segs_labels, val_segs, sess,
+                    num_classes=num_classes, batch_size=batch_size)
                 # Update
-                if valid_ua > best_valid_ua:
-                    best_valid_ua = valid_ua
-                    best_valid_conf = valid_conf
+                if val_ua > best_val_ua:
+                    best_val_ua = val_ua
+                    best_val_conf = val_conf
+                    best_val_step = i + 1
                     if save_path is not None:
                         saver.save(sess, save_path, global_step=i + 1)
-                print("*" * 30)
+
                 print("Epoch: {}".format(i + 1))
                 print("Training cost: {:.04f}".format(train_cost))
                 print("Training UA: {:.02f}%".format(train_acc * 100))
                 print()
-                print("Valid cost: {:.04f}".format(cost_valid))
-                print("Valid UA: {:.02f}%".format(valid_ua * 100))
+                print("Valid cost: {:.04f}".format(val_cost))
+                print("Valid UA: {:.02f}%".format(val_ua * 100))
                 print('Valid confusion matrix:\n["ang","sad","hap","neu"]')
-                print(valid_conf)
+                print(val_conf)
                 print()
-                print("Best valid UA: {:.02f}%".format(best_valid_ua * 100))
+                print("Best valid UA: {:.02f}%".format(best_val_ua * 100))
                 print('Best valid confusion matrix:\n["ang","sad","hap","neu"]')
-                print(best_valid_conf)
+                print(best_val_conf)
                 print("*" * 30)
+
+        # Test on test set
+        if perform_test:
+            meta_path = "{}-{}.meta".format(save_path, best_val_step)
+            save_dir, _ = os.path.split(save_path)
+            # Load weights
+            saver.restore(sess, tf.train.latest_checkpoint(save_dir))
+            # Start testing
+            test_cost, test_ua, test_conf = test(
+                test_data, test_labels, test_segs_labels, test_segs, sess,
+                num_classes=num_classes, batch_size=batch_size)
+            print("*" * 30)
+            print("RESULTS ON TEST SET:")
+            print("Test cost: {:.04f}, test unweighted accuracy: {:.2f}".format(
+                test_cost, test_ua * 100))
+            print('Test confusion matrix:\n["ang","sad","hap","neu"]')
+            print(best_val_conf)
