@@ -339,9 +339,18 @@ def CB_loss_tf(labels, logits, samples_per_cls, beta=0.9999, is_training=True):
     return loss
 
 
-def train(data, epochs, batch_size, learning_rate, test_every=10,
+def dense_to_one_hot(labels_dense, num_classes):
+    """Convert class labels from scalars to one-hot vectors."""
+    num_labels = labels_dense.shape[0]
+    index_offset = np.arange(num_labels) * num_classes
+    labels_one_hot = np.zeros((num_labels, num_classes))
+    labels_one_hot.flat[index_offset + labels_dense.ravel()] = 1
+    return labels_one_hot
+
+
+def train(data, epochs, batch_size, learning_rate, validate_every=10,
           random_seed=123, num_classes=4, grad_clip=False, dropout_keep_prob=1,
-          save_path=None, use_CBL=False, beta=0.9999, *args, **kwargs):
+          save_path=None, use_CBL=False, beta=0.9999, **kwargs):
     """Short summary.
 
     Parameters
@@ -352,8 +361,8 @@ def train(data, epochs, batch_size, learning_rate, test_every=10,
         Number of epochs.
     batch_size : int
     learning_rate : float
-    test_every : int
-        Number of batches between each test.
+    validate_every : int
+        Number of training steps between each validation.
     random_seed : int
         Random seed for reproducibility.
     num_classes : int
@@ -375,36 +384,36 @@ def train(data, epochs, batch_size, learning_rate, test_every=10,
     # For reproducibility
     tf.random.set_random_seed(random_seed)
     np.random.seed(random_seed)
-    # Unpack data
-    train_data, train_labels, val_data, val_labels, val_segs_labels, val_segs, test_data, test_labels, test_segs_labels, test_segs = data
+    # Load data
+    train_data, train_labels = data[0:2]
+    val_data, val_labels, val_segs_labels, val_segs = data[2:6]
+    test_data, test_labels, test_segs_labels, test_segs = data[6:10]
     # One-hot encoding
     train_labels = to_categorical(train_labels, num_classes)
     val_labels = to_categorical(val_labels, num_classes)
     val_segs_labels = to_categorical(val_segs_labels, num_classes)
     # Parameters
     num_train, image_height, image_width, image_channel = train_data.shape
-    num_val = val_labels.shape[0]
-    num_val_segs = val_segs_labels.shape[0]
-    # Best unweighted accuracy on validation set
+    num_val = val_segs.shape[0]
+    num_val_segs = val_data.shape[0]
     best_valid_ua = 0
     # Construct model
     X = tf.placeholder(
         tf.float32, shape=[None, image_height, image_width, image_channel])
     Y = tf.placeholder(tf.int32, shape=[None, num_classes])
-
-    lr = tf.placeholder(tf.float32)
     is_training = tf.placeholder(tf.bool)
+    lr = tf.placeholder(tf.float32)
     keep_prob = tf.placeholder(tf.float32)
     # Cost
-    logits = acrnn(X, is_training=is_training,
-                   dropout_keep_prob=keep_prob, **kwargs)
+    logits = acrnn(
+        X, is_training=is_training, dropout_keep_prob=keep_prob, **kwargs)
     if not use_CBL:
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
             labels=Y, logits=logits)
         cost = tf.reduce_mean(cross_entropy)
     else:
-        _, samples_per_cls = np.unique(np.argmax(train_labels, axis=-1),
-                                       return_counts=True)
+        _, samples_per_cls = np.unique(
+            np.argmax(train_labels, axis=-1), return_counts=True)
         cross_entropy = CB_loss_tf(
             labels=tf.cast(Y, "float64"), logits=logits,
             samples_per_cls=samples_per_cls, beta=beta, is_training=False)
@@ -418,7 +427,8 @@ def train(data, epochs, batch_size, learning_rate, test_every=10,
         train_op = tf.train.AdamOptimizer(lr).minimize(cost)
     else:
         # Apply gradient clipping
-        grads, _ = tf.clip_by_global_norm(tf.gradients(cost, var_trainable_op), 5)
+        grads, _ = tf.clip_by_global_norm(
+            tf.gradients(cost, var_trainable_op), 5)
         opti = tf.train.AdamOptimizer(lr)
         train_op = opti.apply_gradients(zip(grads, var_trainable_op))
     # Predictions and accuracy
@@ -426,77 +436,77 @@ def train(data, epochs, batch_size, learning_rate, test_every=10,
     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
     saver = tf.train.Saver(tf.global_variables())
     init = tf.global_variables_initializer()
-
     # Start training
-    idxs = np.arange(num_train, dtype=np.int8) # indices for training data
-    num_batches = math.ceil(num_train / batch_size) # number of batches in each epoch
     with tf.Session() as sess:
         sess.run(init)
-        for epoch in range(epochs):
-            for batch in range(num_batches):
-                idxs_batch = idxs[batch * batch_size:(batch + 1) * batch_size]
-                train_data_batch = train_data[idxs_batch]
-                train_labels_batch = train_labels[idxs_batch]
-                # Foward
-                _, cost_train, acc = sess.run(
-                    [train_op, cost, accuracy],
-                    feed_dict={X: train_data_batch, Y: train_labels_batch,
-                               is_training: True, keep_prob: dropout_keep_prob,
-                               lr: learning_rate}
-                )
-                # Test on validation set
-                if batch % test_every == 0:
-                    cost_val = 0
-                    num_batches_val = math.ceil(num_val_segs / batch_size)
-                    # Store predictions
-                    y_val_segs = np.empty((num_val_segs, num_classes),
-                                          dtype=np.float32)
-                    y_val = np.empty((num_val, num_classes), dtype=np.float32)
+        for i in range(epochs):
+            start = (i * batch_size) % num_train
+            end = min(start + batch_size, num_train)
+            feed_dict = {X: train_data[start:end], Y: train_labels[start:end],
+                         is_training: True, keep_prob: dropout_keep_prob,
+                         lr: learning_rate}
+            _, train_cost, train_acc = sess.run([train_op, cost, accuracy],
+                                                feed_dict=feed_dict)
+            # Test on validation set
+            if i % validate_every == 0:
+                # Store predictions
+                y_val_segs = np.empty(
+                    (num_val_segs, num_classes), dtype=np.float32)
+                y_val = np.empty((num_val, 4), dtype=np.float32)
 
-                    for batch_val in range(num_batches_val):
-                        val_data_batch = val_data[batch_val * batch_size:(batch_val + 1) * batch_size]
-                        val_labels_batch = val_segs_labels[batch_val * batch_size:(batch_val + 1) * batch_size]
+                cost_valid = 0
+                if num_val_segs < batch_size:
+                    loss, y_val_segs = sess.run(
+                        [cross_entropy, logits],
+                        feed_dict={X: val_data, Y: val_segs_labels,
+                                   is_training: False, keep_prob: 1}
+                    )
+                    cost_valid = cost_valid + np.sum(loss)
 
-                        loss, y_val_pred_batch = sess.run(
-                            [cross_entropy, logits],
-                            feed_dict={X: val_data_batch, Y: val_labels_batch,
-                                       is_training: False, keep_prob: 1}
-                        )
-                        cost_val += np.sum(loss)
-                        y_val_segs[batch_val * batch_size:(batch_val + 1) * batch_size] = y_val_pred_batch
-                    cost_val /= num_val_segs
-                    # Accumulate results, since each utterance might contain
-                    # more than one segments
-                    curr_i = 0
-                    for v in range(num_val):
-                        y_val[v] = np.max(y_val_segs[curr_i:curr_i + val_segs[v]], axis=0)
-                        curr_i += val_segs[v]
-
-                    v_labels = np.argmax(val_labels, axis=1)
-                    y_val = np.argmax(y_val, axis=1)
-                    # Recall and confusion matrix
-                    valid_ua = recall(v_labels, y_val, average='macro')
-                    valid_conf = confusion(v_labels, y_val)
-                    # Update
-                    global_step = epoch * num_batches + batch
-                    if valid_ua > best_valid_ua:
-                        best_valid_ua = valid_ua
-                        best_valid_conf = valid_conf
-                        if save_path is not None:
-                            saver.save(sess, save_path,
-                                       global_step=global_step)
-
-                    print("*" * 30)
-                    print("Epoch: {}, batch: {}, global step: {}".format(epoch, batch, global_step))
-                    print("Training cost: {:.04f}".format(cost_train))
-                    print("Training UA: {:.02f}%".format(acc * 100))
-                    print()
-                    print("Valid cost: {:.04f}".format(cost_val))
-                    print("Valid UA: {:.02f}%".format(valid_ua * 100))
-                    print('Valid confusion matrix:\n["ang","sad","hap","neu"]')
-                    print(valid_conf)
-                    print()
-                    print("Best valid UA: {:.02f}%".format(best_valid_ua * 100))
-                    print('Best valid confusion matrix:\n["ang","sad","hap","neu"]')
-                    print(best_valid_conf)
-                    print("*" * 30)
+                num_batches_val = divmod((num_val_segs), batch_size)[0]
+                for batch_val in range(num_batches_val):
+                    v_begin = batch_val * batch_size
+                    v_end = (batch_val + 1) * batch_size
+                    if batch_val == num_batches_val - 1:
+                        if v_end < num_val_segs:
+                            v_end = num_val_segs
+                    loss, y_val_segs[v_begin:v_end] = sess.run(
+                        [cross_entropy, logits],
+                        feed_dict={X: val_data[v_begin:v_end],
+                                   Y: val_segs_labels[v_begin:v_end],
+                                   is_training: False, keep_prob: 1})
+                    cost_valid = cost_valid + np.sum(loss)
+                cost_valid = cost_valid / num_val_segs
+                # Accumulate results, since each utterance might contain
+                # more than one segments
+                curr_i = 0
+                for v in range(num_val):
+                    y_val[v, :] = np.max(
+                        y_val_segs[curr_i:curr_i + val_segs[v]], 0)
+                    curr_i = curr_i + val_segs[v]
+                # Recall and confusion matrix
+                valid_ua = recall(
+                    np.argmax(val_labels, 1), np.argmax(y_val, 1),
+                    average='macro')
+                valid_conf = confusion(
+                    np.argmax(val_labels, 1), np.argmax(y_val, 1))
+                # Update
+                if valid_ua > best_valid_ua:
+                    best_valid_ua = valid_ua
+                    best_valid_conf = valid_conf
+                    if save_path is not None:
+                        saver.save(sess, save_path, global_step=i + 1)
+                print("*" * 30)
+                print("Epoch: {}".format(i + 1))
+                print("Training cost: {:.04f}".format(train_cost))
+                print("Training UA: {:.02f}%".format(train_acc * 100))
+                print()
+                print("Valid cost: {:.04f}".format(cost_valid))
+                print("Valid UA: {:.02f}%".format(valid_ua * 100))
+                print('Valid confusion matrix:\n["ang","sad","hap","neu"]')
+                print(valid_conf)
+                print()
+                print("Best valid UA: {:.02f}%".format(best_valid_ua * 100))
+                print('Best valid confusion matrix:\n["ang","sad","hap","neu"]')
+                print(best_valid_conf)
+                print("*" * 30)
