@@ -15,14 +15,15 @@ def read_wave_from_file(filepath):
     Returns
     -------
     wave_data: ndarray
-        Wave data extracted from the *.wav file.
+        An array of shape (num_frames * 2,) representing the wave data extracted
+        from the *.wav file.
     ticks: ndarray
-        An array representing ticks in the audio sequence.
+        An array of shape (num_frames,) representing ticks in the audio sequence.
     frame_rate: int
         Number of frames per second.
 
     """
-    with wave.open(filepath,'r') as fin:
+    with wave.open(filepath, 'r') as fin:
         params = fin.getparams()
         num_channels, samp_width, frame_rate, num_frames = params[:4]
         # Read all available frames
