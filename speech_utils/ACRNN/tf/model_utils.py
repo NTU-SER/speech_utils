@@ -2,6 +2,7 @@ import os
 import math
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from keras.utils import to_categorical
 from sklearn.metrics import recall_score as recall
@@ -452,6 +453,10 @@ def test(test_data, test_labels, test_segs_labels, test_segs, sess,
         np.argmax(test_labels, 1), np.argmax(y_test, 1), average='macro')
     test_conf = confusion(
         np.argmax(test_labels, 1), np.argmax(y_test, 1))
+    # Make confusion matrix into data frame for readability
+    test_conf = pd.DataFrame({"ang": test_conf[:, 0], "sad": test_conf[:, 1],
+                              "hap": test_conf[:, 2], "neu": test_conf[:, 3]})
+    test_conf = test_conf.to_string(index=False)
     return test_cost, test_ua, test_conf
 
 
@@ -598,7 +603,7 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
                 num_classes=num_classes, batch_size=batch_size)
             print("*" * 30)
             print("RESULTS ON TEST SET:")
-            print("Test cost: {:.04f}, test unweighted accuracy: {:.2f}".format(
-                test_cost, test_ua * 100))
+            print("Test cost: {:.04f}, test unweighted accuracy: "
+                  "{:.2f}%".format(test_cost, test_ua * 100))
             print('Test confusion matrix:\n["ang","sad","hap","neu"]')
             print(best_val_conf)
