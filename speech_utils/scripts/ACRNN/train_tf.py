@@ -13,6 +13,9 @@ session = tf.Session(config=config).as_default()
 
 
 def main(args):
+    # Verify
+    if args.save_path is None and args.perform_test:
+        raise ValueError("Cannot test when `save_path` is set to `None`.")
     # Load data
     with open(args.data_path, "rb") as fin:
         data = pickle.load(fin)
@@ -27,7 +30,7 @@ def main(args):
           validate_every=args.validate_every, random_seed=args.seed,
           num_classes=args.num_classes, grad_clip=args.grad_clip,
           dropout_keep_prob=1 - args.dropout, save_path=args.save_path,
-          use_CBL=args.use_cbl, beta=args.beta)
+          use_CBL=args.use_cbl, beta=args.beta, perform_test=args.perform_test)
 
 
 def parse_arguments(argv):
@@ -54,13 +57,18 @@ def parse_arguments(argv):
     parser.add_argument('--grad_clip', action='store_true',
         help='Whether to clip gradients of Adam optimizer.')
     parser.add_argument('--save_path', type=str, default=None,
-        help='Path to save the best models.')
+        help='Path to save the best models with `.ckpt` as extension (e.g., '
+             '`save_path=./model.ckpt`, then the model at global step 500 will '
+             'be saved as `./model.ckpt-500.data-00000-of-00001`, '
+             '`./model.ckpt-500.index` and `./model.ckpt-500.meta`).')
 
     parser.add_argument('--swap', action='store_true',
         help='By default, the female recordings of a chosen session is set to '
              'validation data, and the male recordings of that session is set '
              'to test data. Set this to true to swap the validation set with '
              'the test set.')
+    parser.add_argument('--perform_test', action='store_true',
+        help='Whether to test on test data at the end of training process.')
     parser.add_argument('--validate_every', type=int, default=10,
         help='Number of batches between each test.')
     parser.add_argument('--seed', type=int, default=123,
