@@ -1,5 +1,5 @@
 # IPython Notebook for experimenting
-experiment.ipynb
+*.ipynb
 .ipynb_checkpoints
 
 # Cache
