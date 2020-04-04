@@ -22,8 +22,7 @@ class Attention(nn.Module):
                                  out_features=attention_size)
         self.sigmoid = nn.Sigmoid()
         self.linear2 = nn.Linear(in_features=attention_size, out_features=1)
-        self.softmax = nn.LogSoftmax(dim=0)
-        self.batchnorm = nn.BatchNorm1d(hidden_size)
+        self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x):
         """
@@ -46,13 +45,15 @@ class Attention(nn.Module):
         x = x.view(-1, dims[-1])
 
         v = self.sigmoid(self.linear1(x))
-        v = self.softmax(self.linear2(v))
+        v = self.linear2(v)
+        # Reshape to apply softmax
+        v = v.view(dims[0], dims[1])
+        v = self.softmax(v)
 
-        v = v.view(dims[0], dims[1], 1)
+        v.unsqueeze_(-1)
         x = x.view(*dims)
 
         output = (x * v).sum(axis=1)
-        output = self.batchnorm(output)
         return output
 
 
