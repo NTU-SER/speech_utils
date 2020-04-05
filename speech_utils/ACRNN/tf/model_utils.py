@@ -289,7 +289,6 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
     layer6 = tf.contrib.layers.dropout(
         layer6, keep_prob=dropout_keep_prob, is_training=is_training)
 
-    layer6 = tf.reshape(layer6, [-1, time_step, num_filt_2 * p])
     layer6 = tf.reshape(layer6, [-1, p * num_filt_2])
 
     linear1 = tf.matmul(layer6, linear1_weight) + linear1_bias
@@ -299,18 +298,18 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
 
     # Define lstm cells with tensorflow
     # Forward direction cell
-    gru_fw_cell1 = tf.contrib.rnn.BasicLSTMCell(num_lstm_units, forget_bias=1.0)
+    gru_fw_cell = tf.contrib.rnn.BasicLSTMCell(num_lstm_units, forget_bias=1.0)
     # Backward direction cell
-    gru_bw_cell1 = tf.contrib.rnn.BasicLSTMCell(num_lstm_units, forget_bias=1.0)
+    gru_bw_cell = tf.contrib.rnn.BasicLSTMCell(num_lstm_units, forget_bias=1.0)
 
     # Now we feed `layer_3` into the LSTM BRNN cell and obtain the LSTM BRNN
     # output.
-    outputs1, output_states1 = tf.nn.bidirectional_dynamic_rnn(
-        cell_fw=gru_fw_cell1, cell_bw=gru_bw_cell1, inputs=linear1,
+    outputs, output_states = tf.nn.bidirectional_dynamic_rnn(
+        cell_fw=gru_fw_cell, cell_bw=gru_bw_cell, inputs=linear1,
         dtype=tf.float32, time_major=False, scope='LSTM')
 
     # Attention layer
-    gru, alphas = attention(outputs1, 1, return_alphas=True)
+    gru, alphas = attention(outputs, 1, return_alphas=True)
     # Fully connected layers
     fully1 = tf.matmul(gru, fully1_weight) + fully1_bias
     fully1 = leaky_relu(fully1, 0.01)
@@ -387,7 +386,7 @@ def CB_loss_tf(labels, logits, samples_per_cls, beta=0.9999, is_training=True,
 
 def test(test_data, test_labels, test_segs_labels, test_segs, sess,
          num_classes=4, batch_size=64):
-    """Short summary.
+    """Test a 3DCRNN model.
 
     Parameters
     ----------
@@ -448,11 +447,11 @@ def test(test_data, test_labels, test_segs_labels, test_segs, sess,
         y_test[v, :] = np.max(
             y_test_segs[curr_i:curr_i + test_segs[v]], 0)
         curr_i = curr_i + test_segs[v]
-    # Recall and confusion matrix
-    test_ua = recall(
-        np.argmax(test_labels, 1), np.argmax(y_test, 1), average='macro')
-    test_conf = confusion(
-        np.argmax(test_labels, 1), np.argmax(y_test, 1))
+    # Accuracy and confusion matrix
+    test_labels = np.argmax(test_labels, 1)
+    y_test = np.argmax(y_test, 1)
+    test_ua = (test_labels == y_test).mean()
+    test_conf = confusion(test_labels, y_test)
     # Make confusion matrix into data frame for readability
     test_conf = pd.DataFrame({"ang": test_conf[:, 0], "sad": test_conf[:, 1],
                               "hap": test_conf[:, 2], "neu": test_conf[:, 3]})
@@ -464,7 +463,7 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
           random_seed=123, num_classes=4, grad_clip=False, dropout_keep_prob=1,
           save_path=None, use_CBL=False, beta=0.9999, perform_test=False,
           **kwargs):
-    """Short summary.
+    """Train a 3DCRNN model.
 
     Parameters
     ----------
@@ -550,7 +549,7 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
         train_op = opti.apply_gradients(zip(grads, var_trainable_op))
     # Predictions and accuracy
     correct_pred = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
-    accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+    accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32), name="acc")
     saver = tf.train.Saver(tf.global_variables())
     init = tf.global_variables_initializer()
     # Start training
@@ -593,7 +592,6 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
 
         # Test on test set
         if perform_test:
-            meta_path = "{}-{}.meta".format(save_path, best_val_step)
             save_dir, _ = os.path.split(save_path)
             # Load weights
             saver.restore(sess, tf.train.latest_checkpoint(save_dir))
@@ -605,5 +603,5 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
             print("RESULTS ON TEST SET:")
             print("Test cost: {:.04f}, test unweighted accuracy: "
                   "{:.2f}%".format(test_cost, test_ua * 100))
-            print('Test confusion matrix:\n["ang","sad","hap","neu"]')
+            print('Test confusion matrix:')
             print(best_val_conf)
