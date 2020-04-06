@@ -1,7 +1,10 @@
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from speech_utils.ACRNN.torch.data_utils import DatasetLoader
 
 class Attention(nn.Module):
     """
@@ -434,3 +437,187 @@ class ClassBalancedLoss(nn.Module):
                 y_hat = y_hat.softmax(dim=1)
             loss = self.loss(y_hat, y_one_hot, weights)
         return loss
+
+
+def test(model, loss_function, test_dataset, batch_size, device,
+         return_matrix=False):
+    """Test a 3DCRNN model.
+
+    Parameters
+    ----------
+    model
+        PyTorch model.
+    loss_function
+    test_dataset : `speech_utils.ACRNN.torch.data_utils.TestLoader` instance
+        The test dataset.
+    batch_size : int
+    device
+    return_matrix : bool
+        Whether to return the confusion matrix.
+
+    Returns
+    -------
+    test_loss
+        Description of returned object.
+
+    """
+    test_loss = 0
+    test_preds_segs = []
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False)
+
+    for test_data_batch, test_labels_batch in test_loader:
+        # Send to correct device
+        test_data_batch = test_data_batch.to(device)
+        test_labels_batch = test_labels_batch.to(device).long()
+        # Forward
+        test_preds_batch = model(test_data_batch)
+        test_preds_segs.append(test_preds_batch.cpu())
+        # Loss
+        test_loss += loss_function(test_preds_batch, test_labels_batch)
+    # Val average loss
+    test_loss = test_loss.item() / test_dataset.n_samples
+    # Accumulate results for val data
+    test_preds_segs = np.vstack(test_preds_segs)
+    test_preds = test_dataset.get_preds(test_preds_segs)
+    # Make sure everything works properly
+    assert len(test_preds) == test_dataset.n_actual_samples
+    test_ua = test_dataset.accuracy(test_preds)
+    test_ur = test_dataset.recall(test_preds)
+    if return_matrix:
+        test_conf = test_dataset.confusion_matrix(test_preds)
+        return test_loss, test_ua * 100, test_ur * 100, test_conf
+    else:
+        return test_loss, test_ua * 100, test_ur * 100
+
+
+def train(data, epochs, batch_size, learning_rate, random_seed=123,
+          num_classes=4, dropout_keep_prob=1, save_path=None,
+          loss_type="sigmoid", beta=0.9999, perform_test=False, **kwargs):
+    """Train a 3DCRNN model in an epoch-based manner with PyTorch. Note that
+    this function does not work with CPU (specifically, if you want to train on
+    CPU, modify the module `ClassBalancedLoss` and this function.)
+
+    Parameters
+    ----------
+    data : tuple
+        Data extracted using `speech_utils.ACRNN.data_utils.extract_mel`.
+    epochs : int
+        Number of epochs.
+    batch_size : int
+    learning_rate : float
+    random_seed : int
+        Random seed for reproducibility.
+    num_classes : int
+        Number of classes.
+    dropout_keep_prob : float
+        The probability of keeping a connection in dropout.
+    save_path : str
+        Path to save the best model.
+    loss_type : str
+        One of ["ce", "sigmoid", "softmax", "focal"].
+            If "ce", use the normal Cross Entropy Loss with weights computed as
+            the number of sampels per class.
+            Otherwise, use the Class Balanced Loss with the corresponding loss
+            type.
+    beta : float
+        Hyperparameter for Class Balanced Loss. Default: 0.9999
+    perform_test : bool
+        Whether to test on test data at the end of training process.
+    **kwargs
+        Custom keyword arguments to pass to the ACRNN constructor.
+
+    """
+    np.random.seed(random_seed)
+    torch.manual_seed(random_seed)
+    if loss_type not in ["ce", "sigmoid", "softmax", "focal"]:
+        raise ValueError("Invalid loss type. Expected one of "
+                         "[\"ce\", \"sigmoid\", \"softmax\", \"focal\"]. Got {}"
+                         " instead.".format(loss_type))
+    # Load data into train and test set
+    pre_process = lambda x: np.moveaxis(x, 3, 1).astype("float32")
+    dataloader = DatasetLoader(
+        data, num_classes=num_classes, pre_process=pre_process)
+    train_dataset = dataloader.get_train_dataset()
+    val_dataset = dataloader.get_val_dataset()
+    # Construct model
+    device = torch.device("cuda:0")
+    model = ACRNN(dropout_keep_prob=dropout_keep_prob, **kwargs)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    model = model.to(device=device)
+    # Loss
+    _, samples_per_cls = np.unique(
+        train_dataset.target, return_counts=True)
+    if loss_type == "ce": # cross-entropy:
+        loss_function = nn.CrossEntropyLoss(weight=samples_per_cls)
+    else:
+        loss_function = ClassBalancedLoss(
+            samples_per_cls=samples_per_cls, loss_type=loss_type, beta=beta)
+    # For logging
+    labs = ["Train", "Val", "Best Val"]
+    loss_format = "{:.04f}"
+    acc_format = "{:.02f}%"
+    # Start training
+    best_val_ua = 0
+    for epoch in range(epochs):
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=batch_size, shuffle=False)
+        train_preds = []
+        # Train one epoch
+        for train_data_batch, train_labels_batch in train_loader:
+            # Clear gradients
+            optimizer.zero_grad()
+            # Send data to correct device
+            train_data_batch = train_data_batch.to(device)
+            train_labels_batch = train_labels_batch.to(device).long()
+            # Forward pass
+            preds = model(train_data_batch)
+            # Compute the loss, gradients, and update the parameters
+            train_loss = loss_function(preds, train_labels_batch)
+            train_loss.backward()
+            optimizer.step()
+            # Accumulate batch results
+            train_preds.append(torch.argmax(preds, axis=1).cpu())
+        # Evaluate training data
+        train_loss = train_loss.item() / batch_size
+        train_preds = np.concatenate(train_preds)
+        train_ua = train_dataset.accuracy(train_preds) * 100
+        train_ur = train_dataset.recall(train_preds) * 100
+        # Evaluate validation data
+        with torch.no_grad():
+            val_loss, val_ua, val_ur = test(
+                model, loss_function, val_dataset, batch_size=batch_size,
+                device=device)
+            # Update
+            if val_ua > best_val_ua:
+                best_val_ua = val_ua
+                best_val_ur = val_ur
+                best_val_loss = val_loss
+                if save_path is not None:
+                    torch.save(model.state_dict(), save_path)
+            # Combine results
+            loss = [loss_format.format(i) for i in \
+                [train_loss, val_loss, best_val_loss]]
+            ua = [acc_format.format(i) for i in [train_ua, val_ua, best_val_ua]]
+            ur = [acc_format.format(i) for i in [train_ur, val_ur, best_val_ur]]
+
+            loss = dict(zip(labs, loss))
+            ua = dict(zip(labs, ua))
+            ur = dict(zip(labs, ur))
+            df = pd.DataFrame({"Loss": loss, "UA": ua, "UR": ur})
+            print("*" * 40)
+            print("Epoch #{}".format(epoch + 1))
+            print(df)
+
+    # Test at the end of training
+    if perform_test:
+        with torch.no_grad():
+            model.load_state_dict(torch.load(save_path))
+            test_loss, test_ua, test_ur, test_conf = test(
+                model, loss_function, test_dataset, batch_size=batch_size,
+                device=device, return_matrix=True)
+            print("*" * 40)
+            print("RESULTS ON TEST SET:")
+            print("Loss:{:.4f}\tUnweighted Accuracy: {:.2f}\tUnweighted Recall: "
+                  "{:.2f}".format(test_loss, test_ua, test_ur))
+            print("Confusion matrix:\n{}".format(test_conf))
