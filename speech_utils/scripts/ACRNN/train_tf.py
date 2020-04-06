@@ -26,7 +26,7 @@ def main(args):
         val_data = data[6:10]
         data = (*train_data, *val_data, *test_data)
     # Train
-    train(data, args.num_epochs, args.batch_size, args.lr,
+    train(data, args.num_steps, args.batch_size, args.lr,
           validate_every=args.validate_every, random_seed=args.seed,
           num_classes=args.num_classes, grad_clip=args.grad_clip,
           dropout_keep_prob=1 - args.dropout, save_path=args.save_path,
@@ -35,11 +35,13 @@ def main(args):
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="Train a 3DCRNN model in an iterative-based manner with "
+                    "Tensorflow.")
 
     parser.add_argument('data_path', type=str,
         help='Path to the features extracted from `extract_mel.py`.')
-    parser.add_argument('num_epochs', type=int, help='Number of epochs.')
+    parser.add_argument('num_steps', type=int, help='Number of global steps.')
 
     parser.add_argument('--batch_size', type=int, default=60,
         help='Mini batch size.')

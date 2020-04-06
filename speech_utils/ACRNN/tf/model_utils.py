@@ -320,7 +320,7 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
     return logits
 
 
-def CB_loss_tf(labels, logits, samples_per_cls, beta=0.9999, is_training=True,
+def CB_loss(labels, logits, samples_per_cls, beta=0.9999, is_training=True,
                name=None):
     """
     Reference: "Class-Balanced Loss Based on Effective Number of Samples"
@@ -459,18 +459,18 @@ def test(test_data, test_labels, test_segs_labels, test_segs, sess,
     return test_cost, test_ua, test_conf
 
 
-def train(data, epochs, batch_size, learning_rate, validate_every=10,
-          random_seed=123, num_classes=4, grad_clip=False, dropout_keep_prob=1,
+def train(data, steps, batch_size, learning_rate, validate_every=10,
+          random_seed=136, num_classes=4, grad_clip=False, dropout_keep_prob=1,
           save_path=None, use_CBL=False, beta=0.9999, perform_test=False,
           **kwargs):
-    """Train a 3DCRNN model.
+    """Train a 3DCRNN model in an iterative-based manner with Tensorflow.
 
     Parameters
     ----------
     data : tuple
-        Data extracted using speech_utils.ACRNN.data_utils.extract_mel
-    epochs : int
-        Number of epochs.
+        Data extracted using `speech_utils.ACRNN.data_utils.extract_mel`.
+    steps : int
+        Number of global steps.
     batch_size : int
     learning_rate : float
     validate_every : int
@@ -530,10 +530,10 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
     else:
         _, samples_per_cls = np.unique(
             np.argmax(train_labels, axis=-1), return_counts=True)
-        cross_entropy = CB_loss_tf(
+        cross_entropy = CB_loss(
             labels=tf.cast(Y, "float64"), logits=logits, is_training=False,
             samples_per_cls=samples_per_cls, beta=beta, name="cross_entropy")
-        cost = CB_loss_tf(labels=tf.cast(Y, "float64"), logits=logits,
+        cost = CB_loss(labels=tf.cast(Y, "float64"), logits=logits,
                           samples_per_cls=samples_per_cls, beta=beta)
 
     var_trainable_op = tf.trainable_variables()
@@ -555,7 +555,7 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
     # Start training
     with tf.Session() as sess:
         sess.run(init)
-        for i in range(epochs):
+        for i in range(steps):
             start = (i * batch_size) % num_train
             end = min(start + batch_size, num_train)
             feed_dict = {X: train_data[start:end], Y: train_labels[start:end],
@@ -604,4 +604,4 @@ def train(data, epochs, batch_size, learning_rate, validate_every=10,
             print("Test cost: {:.04f}, test unweighted accuracy: "
                   "{:.2f}%".format(test_cost, test_ua * 100))
             print('Test confusion matrix:')
-            print(best_val_conf)
+            print(test_conf)
