@@ -50,7 +50,7 @@ class Attention(nn.Module):
         v = v.view(dims[0], dims[1])
         v = self.softmax(v)
 
-        v.unsqueeze_(-1)
+        v = v.unsqueeze(-1)
         x = x.view(*dims)
 
         output = (x * v).sum(axis=1)
@@ -251,8 +251,9 @@ class ACRNN(nn.Module):
         x = self.dropout(self.leaky_relu(x))
         # Reshape. Note that in PyTorch, the input of LSTM
         # is of shape (seq_len, batch, input_features)
-        x = x.view(self.params["time_step"], -1,
+        x = x.view(-1, self.params["time_step"],
                    self.params["num_linear_units"])
+        x = x.permute(1, 0, 2)
         assert x.shape[1] == batch_size
         # Bi-LSTM
         x, _ = self.bilstm(x)
@@ -384,12 +385,12 @@ class ClassBalancedLoss(nn.Module):
 
         if loss_type == "sigmoid":
             self.loss = lambda x, y, z: F.binary_cross_entropy_with_logits(
-                x, y, z, *args, **kwargs)
+                x, y, z, **kwargs)
         elif loss_type == "softmax":
             self.loss = lambda x, y, z: F.binary_cross_entropy(
-                x, y, z, *args, **kwargs)
+                x, y, z, **kwargs)
         elif loss_type == "focal":
-            self.loss = FocalLoss(*args, **kwargs)
+            self.loss = FocalLoss(**kwargs)
 
 
     def calc_weights(self):
