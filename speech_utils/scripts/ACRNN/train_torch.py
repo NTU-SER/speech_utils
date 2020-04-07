@@ -10,7 +10,9 @@ def main(args):
     if args.save_path is None and args.perform_test:
         raise ValueError("Cannot test when `save_path` is set to `None`.")
     if args.loss_type not in ["ce", "sigmoid", "softmax", "focal"]:
-        raise ValueError("Invalid loss type.")
+        raise ValueError("Invalid loss type. Expected one of "
+                         "[\"ce\", \"sigmoid\", \"softmax\", \"focal\"]. Got {}"
+                         " instead.".format(args.loss_type))
     # Load data
     with open(args.data_path, "rb") as fin:
         data = pickle.load(fin)

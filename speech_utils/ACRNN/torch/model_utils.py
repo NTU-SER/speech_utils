@@ -540,6 +540,7 @@ def train(data, epochs, batch_size, learning_rate, random_seed=123,
         data, num_classes=num_classes, pre_process=pre_process)
     train_dataset = dataloader.get_train_dataset()
     val_dataset = dataloader.get_val_dataset()
+    test_dataset = dataloader.get_test_dataset()
     # Construct model
     device = torch.device("cuda:0")
     model = ACRNN(dropout_keep_prob=dropout_keep_prob, **kwargs)
