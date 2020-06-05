@@ -5,7 +5,8 @@ import numpy as np
 
 def read_wave_from_file(filepath):
     """Read wave data from a *.wav file.
-    Adapted from https://github.com/xuanjihe/speech-emotion-recognition/blob/master/zscore.py
+    Adapted from
+        https://github.com/xuanjihe/speech-emotion-recognition/blob/master/zscore.py
 
     Parameters
     ----------
@@ -15,10 +16,11 @@ def read_wave_from_file(filepath):
     Returns
     -------
     wave_data: ndarray
-        An array of shape (num_frames * 2,) representing the wave data extracted
-        from the *.wav file.
+        An array of shape (num_frames * 2,) representing the wave data
+        extracted from the *.wav file.
     ticks: ndarray
-        An array of shape (num_frames,) representing ticks in the audio sequence.
+        An array of shape (num_frames,) representing ticks in the audio
+        sequence.
     frame_rate: int
         Number of frames per second.
 

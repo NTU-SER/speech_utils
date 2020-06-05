@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 from speech_utils.ACRNN.torch.data_utils import DatasetLoader
 
+
 class Attention(nn.Module):
     """
     Attention implementation equivalent to Tensorflow's version at
@@ -33,15 +34,17 @@ class Attention(nn.Module):
         ----------
         x : tensor
             Tensor of shape (B, H, W), where B is batch size, H is image height
-            and W is image width. (For 3D-CRNN, x is a tensor of shape (B, T, L),
-            where T is the number of time step and L is the LSTM hidden size
-            (or 2 * the LSTM hidden size if LSTM is bi-directional)).
+            and W is image width. (For 3D-CRNN, x is a tensor of shape
+            (B, T, L), where T is the number of time step and L is the LSTM
+            hidden size (or 2 * the LSTM hidden size if LSTM is
+            bi-directional)).
 
         Returns
         -------
         tensor
-            Tensor of shape (B, W), where A is the attention size. (For 3D-CRNN,
-            output is a tensor of shape (B, L), where L is defined as above).
+            Tensor of shape (B, W), where A is the attention size. (For
+            3D-CRNN, output is a tensor of shape (B, L), where L is defined as
+            above).
 
         """
         dims = x.size()
@@ -62,15 +65,15 @@ class Attention(nn.Module):
 
 class ACRNN(nn.Module):
     """
-    Reference: "3-D Convolutional Recurrent Neural Networks with Attention Model
-    for Speech Emotion Recognition"
+    Reference: "3-D Convolutional Recurrent Neural Networks with Attention
+    Model for Speech Emotion Recognition"
     Authors: Chen Mingyi and
              He Xuanji and
              Yang Jing and
              Zhang Han.
 
     Adapted from
-    https://github.com/xuanjihe/speech-emotion-recognition/blob/master/acrnn1.py
+        https://github.com/xuanjihe/speech-emotion-recognition/blob/master/acrnn1.py
 
     3D-CRNN model wrapper with PyTorch. Take `inputs` as model input and
     return the model logits.
@@ -220,8 +223,8 @@ class ACRNN(nn.Module):
         -------
         tensor
             A tensor of shape (B, N), where N is the number of classes.
-            This tensor is the output of the last linear layer (without applying
-            softmax function).
+            This tensor is the output of the last linear layer (without
+            applying softmax function).
 
         """
         batch_size = x.shape[0]
@@ -280,8 +283,8 @@ class FocalLoss(nn.Module):
     Adapted from
         https://github.com/clcarwin/focal_loss_pytorch/blob/master/focalloss.py
 
-    Allow using dynamic alpha (weights) for each pass (instead in fixed alpha as
-    in the original implementation.)
+    Allow using dynamic alpha (weights) for each pass (instead in fixed alpha
+    as in the original implementation.)
 
     Parameters
     ----------
@@ -290,8 +293,8 @@ class FocalLoss(nn.Module):
     alpha : float, int, list or tensor
         Note that if alpha is passed in each pass then this default alpha value
         will be overwritten.
-        If float or int: then alpha is the weight of the first class in a binary
-        classification task.
+        If float or int: then alpha is the weight of the first class in a
+        binary classification task.
         If list or tensor: then alpha is a list of weights of all classes in a
         multi-class classification task.
     size_average : bool
@@ -331,9 +334,11 @@ class FocalLoss(nn.Module):
 
         """
         if input.dim() > 2:
-            input = input.view(input.size(0), input.size(1), -1)  # N,C,H,W => N,C,H*W
-            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
-            input = input.contiguous().view(-1, input.size(2))   # N,H*W,C => N*H*W,C
+            input = input.view(
+                input.size(0), input.size(1), -1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1, 2)    # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(
+                -1, input.size(2))   # N,H*W,C => N*H*W,C
         target = target.view(-1, 1)
 
         logpt = F.log_softmax(input)
@@ -359,8 +364,9 @@ class FocalLoss(nn.Module):
 
 class ClassBalancedLoss(nn.Module):
     """
-    Compute the Class Balanced Loss between `logits` and the ground truth `labels`.
-    Class Balanced Loss: ((1 - beta)/(1 - beta^n)) * Loss(labels, logits)
+    Compute the Class Balanced Loss between `logits` and the ground truth
+    `labels`. Class Balanced Loss:
+        ((1 - beta)/(1 - beta^n)) * Loss(labels, logits)
     where Loss is one of the standard losses used for Neural Networks.
 
     Parameters
@@ -395,7 +401,6 @@ class ClassBalancedLoss(nn.Module):
         elif loss_type == "focal":
             self.loss = FocalLoss(**kwargs)
 
-
     def calc_weights(self):
         effective_num = 1.0 - np.power(self.beta, self.samples_per_cls)
         weights = (1.0 - self.beta) / effective_num
@@ -405,7 +410,6 @@ class ClassBalancedLoss(nn.Module):
         weights = weights.unsqueeze(0)
 
         return weights
-
 
     def forward(self, y_hat, y):
         """
@@ -532,8 +536,8 @@ def train(data, epochs, batch_size, learning_rate, random_seed=123,
     torch.manual_seed(random_seed)
     if loss_type not in ["ce", "sigmoid", "softmax", "focal"]:
         raise ValueError("Invalid loss type. Expected one of "
-                         "[\"ce\", \"sigmoid\", \"softmax\", \"focal\"]. Got {}"
-                         " instead.".format(loss_type))
+                         "[\"ce\", \"sigmoid\", \"softmax\", \"focal\"]. Got "
+                         "{} instead.".format(loss_type))
     # Load data into train and test set
     pre_process = lambda x: np.moveaxis(x, 3, 1).astype("float32")
     dataloader = DatasetLoader(
@@ -549,7 +553,7 @@ def train(data, epochs, batch_size, learning_rate, random_seed=123,
     # Loss
     _, samples_per_cls = np.unique(
         train_dataset.target, return_counts=True)
-    if loss_type == "ce": # cross-entropy:
+    if loss_type == "ce":  # cross-entropy:
         loss_function = nn.CrossEntropyLoss(weight=samples_per_cls)
     else:
         loss_function = ClassBalancedLoss(
@@ -597,10 +601,12 @@ def train(data, epochs, batch_size, learning_rate, random_seed=123,
                 if save_path is not None:
                     torch.save(model.state_dict(), save_path)
             # Combine results
-            loss = [loss_format.format(i) for i in \
-                [train_loss, val_loss, best_val_loss]]
-            ua = [acc_format.format(i) for i in [train_ua, val_ua, best_val_ua]]
-            ur = [acc_format.format(i) for i in [train_ur, val_ur, best_val_ur]]
+            loss = [loss_format.format(i) for i
+                    in [train_loss, val_loss, best_val_loss]]
+            ua = [acc_format.format(i) for i
+                  in [train_ua, val_ua, best_val_ua]]
+            ur = [acc_format.format(i) for i
+                  in [train_ur, val_ur, best_val_ur]]
 
             loss = dict(zip(labs, loss))
             ua = dict(zip(labs, ua))
@@ -619,6 +625,6 @@ def train(data, epochs, batch_size, learning_rate, random_seed=123,
                 device=device, return_matrix=True)
             print("*" * 40)
             print("RESULTS ON TEST SET:")
-            print("Loss:{:.4f}\tUnweighted Accuracy: {:.2f}\tUnweighted Recall: "
-                  "{:.2f}".format(test_loss, test_ua, test_ur))
+            print("Loss:{:.4f}\tUnweighted Accuracy: {:.2f}\tUnweighted "
+                  "Recall: {:.2f}".format(test_loss, test_ua, test_ur))
             print("Confusion matrix:\n{}".format(test_conf))

@@ -8,9 +8,11 @@ from keras.utils import to_categorical
 from sklearn.metrics import recall_score as recall
 from sklearn.metrics import confusion_matrix as confusion
 
+
 def attention(inputs, attention_size, time_major=False, return_alphas=False):
     """
-    Adapted from https://github.com/xuanjihe/speech-emotion-recognition/blob/master/attention.py
+    Adapted from
+        https://github.com/xuanjihe/speech-emotion-recognition/blob/master/attention.py
     Note that the author has changed the activation function of the fully
     connected layer from tanh to sigmoid.
 
@@ -32,8 +34,8 @@ def attention(inputs, attention_size, time_major=False, return_alphas=False):
                     If time_major == True, this must be a tensor of shape:
                         `[max_time, batch_size, cell.output_size]`.
                 In case of Bidirectional RNN, this must be a tuple
-                (outputs_fw, outputs_bw) containing the forward and the backward
-                RNN outputs `Tensor`.
+                (outputs_fw, outputs_bw) containing the forward and the
+                backward RNN outputs `Tensor`.
                     If time_major == False (default),
                         outputs_fw is a `Tensor` shaped:
                         `[batch_size, max_time, cell_fw.output_size]`
@@ -123,26 +125,26 @@ def batch_norm_wrapper(inputs, is_training, decay=0.999, epsilon=1e-3):
         train_var = tf.assign(
             pop_var, pop_var * decay + batch_var * (1 - decay))
         with tf.control_dependencies([train_mean, train_var]):
-            return tf.nn.batch_normalization(inputs,
-                batch_mean, batch_var, beta, scale, epsilon)
+            return tf.nn.batch_normalization(
+                inputs, batch_mean, batch_var, beta, scale, epsilon)
     else:
-        return tf.nn.batch_normalization(inputs,
-            pop_mean, pop_var, beta, scale, epsilon)
+        return tf.nn.batch_normalization(
+            inputs, pop_mean, pop_var, beta, scale, epsilon)
 
 
 def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
           num_filt_1=128, num_filt_2=256, mp_fsize=(2, 4), num_lstm_units=128,
           num_linear_units=768, num_fcn_units=64):
     """
-    Reference: "3-D Convolutional Recurrent Neural Networks with Attention Model
-    for Speech Emotion Recognition"
+    Reference: "3-D Convolutional Recurrent Neural Networks with Attention
+    Model for Speech Emotion Recognition"
     Authors: Chen Mingyi and
              He Xuanji and
              Yang Jing and
              Zhang Han.
 
     Adapted from
-    https://github.com/xuanjihe/speech-emotion-recognition/blob/master/acrnn1.py
+        https://github.com/xuanjihe/speech-emotion-recognition/blob/master/acrnn1.py
 
     3D-CRNN model wrapper with Tensorflow. Take `inputs` as model input and
     return the model logits.
@@ -181,7 +183,7 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
     """
     image_height, image_width = inputs.get_shape().as_list()[1:3]
     mp_fsize_h, mp_fsize_w = mp_fsize
-    # `time_step` and `p` can be calculated when knowing max pooling filter size
+    # `time_step` and `p` can be calculated when knowing maxpool filter size
     time_step = image_height // mp_fsize_h
     p = image_width // mp_fsize_w
 
@@ -192,36 +194,46 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
         'layer1_bias', shape=[num_filt_1], dtype=tf.float32,
         initializer=tf.constant_initializer(0.1))
     layer1_stride = [1, 1, 1, 1]
+
     layer2_filter = tf.get_variable(
-        'layer2_filter', shape=[5, 3, num_filt_1, num_filt_2], dtype=tf.float32,
+        'layer2_filter', dtype=tf.float32,
+        shape=[5, 3, num_filt_1, num_filt_2],
         initializer=tf.truncated_normal_initializer(stddev=0.1))
     layer2_bias = tf.get_variable(
         'layer2_bias', shape=[num_filt_2], dtype=tf.float32,
         initializer=tf.constant_initializer(0.1))
     layer2_stride = [1, 1, 1, 1]
+
     layer3_filter = tf.get_variable(
-        'layer3_filter', shape=[5, 3, num_filt_2, num_filt_2], dtype=tf.float32,
+        'layer3_filter', dtype=tf.float32,
+        shape=[5, 3, num_filt_2, num_filt_2],
         initializer=tf.truncated_normal_initializer(stddev=0.1))
     layer3_bias = tf.get_variable(
         'layer3_bias', shape=[num_filt_2], dtype=tf.float32,
         initializer=tf.constant_initializer(0.1))
     layer3_stride = [1, 1, 1, 1]
+
     layer4_filter = tf.get_variable(
-        'layer4_filter', shape=[5, 3, num_filt_2, num_filt_2], dtype=tf.float32,
+        'layer4_filter', dtype=tf.float32,
+        shape=[5, 3, num_filt_2, num_filt_2],
         initializer=tf.truncated_normal_initializer(stddev=0.1))
     layer4_bias = tf.get_variable(
         'layer4_bias', shape=[num_filt_2], dtype=tf.float32,
         initializer=tf.constant_initializer(0.1))
     layer4_stride = [1, 1, 1, 1]
+
     layer5_filter = tf.get_variable(
-        'layer5_filter', shape=[5, 3, num_filt_2, num_filt_2], dtype=tf.float32,
+        'layer5_filter', dtype=tf.float32,
+        shape=[5, 3, num_filt_2, num_filt_2],
         initializer=tf.truncated_normal_initializer(stddev=0.1))
     layer5_bias = tf.get_variable(
         'layer5_bias', shape=[num_filt_2], dtype=tf.float32,
         initializer=tf.constant_initializer(0.1))
     layer5_stride = [1, 1, 1, 1]
+
     layer6_filter = tf.get_variable(
-        'layer6_filter', shape=[5, 3, num_filt_2, num_filt_2], dtype=tf.float32,
+        'layer6_filter', dtype=tf.float32,
+        shape=[5, 3, num_filt_2, num_filt_2],
         initializer=tf.truncated_normal_initializer(stddev=0.1))
     layer6_bias = tf.get_variable(
         'layer6_bias', shape=[num_filt_2], dtype=tf.float32,
@@ -255,7 +267,8 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
     layer1 = leaky_relu(layer1, 0.01)
     layer1 = tf.nn.max_pool(
         layer1, ksize=[1, mp_fsize_h, mp_fsize_w, 1],
-        strides=[1, mp_fsize_h, mp_fsize_w, 1], padding='VALID', name='max_pool')
+        strides=[1, mp_fsize_h, mp_fsize_w, 1],
+        padding='VALID', name='max_pool')
     layer1 = tf.contrib.layers.dropout(
         layer1, keep_prob=dropout_keep_prob, is_training=is_training)
 
@@ -321,7 +334,7 @@ def acrnn(inputs, num_classes=4, is_training=True, dropout_keep_prob=1,
 
 
 def CB_loss(labels, logits, samples_per_cls, beta=0.9999, is_training=True,
-               name=None):
+            name=None):
     """
     Reference: "Class-Balanced Loss Based on Effective Number of Samples"
     Authors: Yin Cui and
@@ -334,8 +347,9 @@ def CB_loss(labels, logits, samples_per_cls, beta=0.9999, is_training=True,
     Adapted from the PyTorch version:
       https://github.com/vandit15/Class-balanced-loss-pytorch/blob/master/class_balanced_loss.py
 
-    Compute the Class Balanced Loss between `logits` and the ground truth `labels`.
-    Class Balanced Loss: ((1 - beta) / (1 - beta^n)) * Loss(labels, logits)
+    Compute the Class Balanced Loss between `logits` and the ground truth
+    `labels`. Class Balanced Loss:
+        ((1 - beta) / (1 - beta^n)) * Loss(labels, logits)
     where Loss is standard cross entropy loss.
 
     Parameters
@@ -534,7 +548,7 @@ def train(data, steps, batch_size, learning_rate, validate_every=10,
             labels=tf.cast(Y, "float64"), logits=logits, is_training=False,
             samples_per_cls=samples_per_cls, beta=beta, name="cross_entropy")
         cost = CB_loss(labels=tf.cast(Y, "float64"), logits=logits,
-                          samples_per_cls=samples_per_cls, beta=beta)
+                       samples_per_cls=samples_per_cls, beta=beta)
 
     var_trainable_op = tf.trainable_variables()
     # Optimizer

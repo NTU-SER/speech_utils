@@ -49,19 +49,22 @@ def parse_arguments(argv):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('data_path', type=str,
+    parser.add_argument(
+        'data_path', type=str,
         help='Path to the features extracted from `extract_mel.py`.')
-    parser.add_argument('ckpt_dir', type=str,
-        help='Path to the checkpoints directory.')
+    parser.add_argument(
+        'ckpt_dir', type=str, help='Path to the checkpoints directory.')
 
-    parser.add_argument('--global_step', type=int, default=None,
+    parser.add_argument(
+        '--global_step', type=int, default=None,
         help='Global step of the checkpoint to be tested. If `None`, use the '
              'latest checkpoint')
-    parser.add_argument('--batch_size', type=int, default=60,
-        help='Mini batch size.')
-    parser.add_argument('--num_classes', type=int, default=4,
-        help='Number of classes.')
-    parser.add_argument('--swap', action='store_true',
+    parser.add_argument(
+        '--batch_size', type=int, default=60, help='Mini batch size.')
+    parser.add_argument(
+        '--num_classes', type=int, default=4, help='Number of classes.')
+    parser.add_argument(
+        '--swap', action='store_true',
         help='By default, the female recordings of a chosen session is set to '
              'validation data, and the male recordings of that session is set '
              'to test data. Set this to true to swap the validation set with '

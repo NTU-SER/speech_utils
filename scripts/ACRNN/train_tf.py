@@ -39,41 +39,54 @@ def parse_arguments(argv):
         description="Train a 3DCRNN model in an iterative-based manner with "
                     "Tensorflow.")
 
-    parser.add_argument('data_path', type=str,
+    parser.add_argument(
+        'data_path', type=str,
         help='Path to the features extracted from `extract_mel.py`.')
-    parser.add_argument('num_steps', type=int, help='Number of global steps.')
+    parser.add_argument(
+        'num_steps', type=int, help='Number of global steps.')
 
-    parser.add_argument('--batch_size', type=int, default=60,
-        help='Mini batch size.')
-    parser.add_argument('--num_classes', type=int, default=4,
-        help='Number of classes.')
-    parser.add_argument('--lr', type=int, default=1e-5, help='Learning rate.')
+    parser.add_argument(
+        '--batch_size', type=int, default=60, help='Mini batch size.')
+    parser.add_argument(
+        '--num_classes', type=int, default=4, help='Number of classes.')
+    parser.add_argument(
+        '--lr', type=int, default=1e-5, help='Learning rate.')
 
-    parser.add_argument('--dropout', type=float, default=0.0,
-        help='Probability of a connection being set to 0 (i.e., disconnected).')
-    parser.add_argument('--use_cbl', action="store_true",
+    parser.add_argument(
+        '--dropout', type=float, default=0.0,
+        help='Probability of a connection being set to 0 '
+             '(i.e., disconnected).')
+    parser.add_argument(
+        '--use_cbl', action="store_true",
         help='Whether to use Class Balanced Loss.')
-    parser.add_argument('--beta', type=float, default=0.9999,
+    parser.add_argument(
+        '--beta', type=float, default=0.9999,
         help='Hyperparameter for Class Balanced Loss. Used when '
              '`use_cbl==True`.')
-    parser.add_argument('--grad_clip', action='store_true',
+    parser.add_argument(
+        '--grad_clip', action='store_true',
         help='Whether to clip gradients of Adam optimizer.')
-    parser.add_argument('--save_path', type=str, default=None,
+    parser.add_argument(
+        '--save_path', type=str, default=None,
         help='Path to save the best models with `.ckpt` as extension (e.g., '
-             '`save_path=./model.ckpt`, then the model at global step 500 will '
-             'be saved as `./model.ckpt-500.data-00000-of-00001`, '
+             '`save_path=./model.ckpt`, then the model at global step 500 '
+             'will be saved as `./model.ckpt-500.data-00000-of-00001`, '
              '`./model.ckpt-500.index` and `./model.ckpt-500.meta`).')
 
-    parser.add_argument('--swap', action='store_true',
+    parser.add_argument(
+        '--swap', action='store_true',
         help='By default, the female recordings of a chosen session is set to '
              'validation data, and the male recordings of that session is set '
              'to test data. Set this to true to swap the validation set with '
              'the test set.')
-    parser.add_argument('--perform_test', action='store_true',
+    parser.add_argument(
+        '--perform_test', action='store_true',
         help='Whether to test on test data at the end of training process.')
-    parser.add_argument('--validate_every', type=int, default=10,
+    parser.add_argument(
+        '--validate_every', type=int, default=10,
         help='Number of batches between each test.')
-    parser.add_argument('--seed', type=int, default=None,
+    parser.add_argument(
+        '--seed', type=int, default=None,
         help='Random seed for reproducibility.')
 
     return parser.parse_args(argv)

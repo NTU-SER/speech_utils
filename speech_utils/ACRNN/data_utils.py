@@ -14,13 +14,14 @@ TEST_SESSIONS = ["Session5"]
 def get_files(dataset_dir, train_sessions=TRAIN_SESSIONS,
               test_sessions=TEST_SESSIONS):
     """
-    Adapted from https://github.com/xuanjihe/speech-emotion-recognition/blob/master/ExtractMel.py
+    Adapted from
+        https://github.com/xuanjihe/speech-emotion-recognition/blob/master/ExtractMel.py
 
     Get the lists of all the files needed for training, validation and test
     sets. By default, this function will parse all the improvised data in the
-    first four sessions (1, 2, 3, 4) as training data, all the improvised female
-    recordings in the last session as validation data, and all the improvised
-    male recordings in the last session as test data.
+    first four sessions (1, 2, 3, 4) as training data, all the improvised
+    female recordings in the last session as validation data, and all the
+    improvised male recordings in the last session as test data.
 
     Parameters
     ----------
@@ -47,7 +48,8 @@ def get_files(dataset_dir, train_sessions=TRAIN_SESSIONS,
         if session_name not in sessions:
             continue
         wav_dir = os.path.join(dataset_dir, session_name, "sentences/wav")
-        eval_dir = os.path.join(dataset_dir, session_name, "dialog/EmoEvaluation")
+        eval_dir = os.path.join(
+            dataset_dir, session_name, "dialog/EmoEvaluation")
 
         for speaker_name in os.listdir(wav_dir):
             # Only use improvised data, for example ".../wav/Ses01F_impro01"
@@ -74,7 +76,8 @@ def get_files(dataset_dir, train_sessions=TRAIN_SESSIONS,
                 val_wav.append([path for path in wav_files if path[-8] == "F"])
                 val_lab.append(label_path)
                 # Male for test data
-                test_wav.append([path for path in wav_files if path[-8] == "M"])
+                test_wav.append(
+                    [path for path in wav_files if path[-8] == "M"])
                 test_lab.append(label_path)
     return train_wav, train_lab, val_wav, val_lab, test_wav, test_lab
 
@@ -82,11 +85,12 @@ def get_files(dataset_dir, train_sessions=TRAIN_SESSIONS,
 def calc_zscore(dataset_dir, num_filters, emotions,
                 sessions=TRAIN_SESSIONS, save_path=None):
     """
-    Adapted from https://github.com/xuanjihe/speech-emotion-recognition/blob/master/zscore.py
+    Adapted from
+        https://github.com/xuanjihe/speech-emotion-recognition/blob/master/zscore.py
 
     Read the entire IEMOCAP dataset and calculate z-score from the *.wav files.
-    Remarks: Since the original implementation uses padding, the results are off
-    slightly. In this implementation, the results are exact.
+    Remarks: Since the original implementation uses padding, the results are
+    off slightly. In this implementation, the results are exact.
 
     Parameters
     -------
@@ -117,12 +121,12 @@ def calc_zscore(dataset_dir, num_filters, emotions,
         dataset_dir, train_sessions=sessions)
 
     for wav_files, label_path in zip(train_wav, train_lab):
-        labels = dict() # to store labels of the current conversation
+        labels = dict()  # to store labels of the current conversation
         # Read labels
         with open(label_path, "r") as fin:
             for line in fin:
                 # If this line is sth like
-                # [6.2901 - 8.2357]	Ses01F_impro01_F000	neu	[2.5000, 2.5000, 2.5000]
+                # [6.2901 - 8.2357]	Ses01F_impro01_F000	neu	[2.5, 2.5, 2.5]
                 if line[0] == "[":
                     t = line.split()
                     # For e.g., {"Ses01F_impro01_F000": "neu", ...}
@@ -186,7 +190,8 @@ def _extract_data(emotion, mel_spec, mean_mel_specs, std_mel_specs,
     """
     time = mel_spec.shape[0]
     start, end = 0, 300
-    num_segs = math.ceil(time / 300) # number of segments each with length of 300
+    # Number of segments each with length of 300
+    num_segs = math.ceil(time / 300)
     data_tot = []
 
     # Normalization
@@ -201,11 +206,14 @@ def _extract_data(emotion, mel_spec, mean_mel_specs, std_mel_specs,
             start = max(0, end - 300)
         # Do padding
         mel_spec_pad = np.pad(
-            mel_spec[start:end], ((0, 300 - (end - start)), (0, 0)), mode="constant")
+            mel_spec[start:end], ((0, 300 - (end - start)), (0, 0)),
+            mode="constant")
         delta_pad = np.pad(
-            delta[start:end], ((0, 300 - (end - start)), (0, 0)), mode="constant")
+            delta[start:end], ((0, 300 - (end - start)), (0, 0)),
+            mode="constant")
         delta_delta_pad = np.pad(
-            delta_delta[start:end], ((0, 300 - (end - start)), (0, 0)), mode="constant")
+            delta_delta[start:end], ((0, 300 - (end - start)), (0, 0)),
+            mode="constant")
         # Stack
         data = np.stack([mel_spec_pad, delta_pad, delta_delta_pad], axis=-1)
         data_tot.append(data)
@@ -245,18 +253,21 @@ def extract_data(wav_paths, lab_paths, metadata,
     assert len(wav_paths) == len(lab_paths)
 
     emotions = emot_map.keys()
-    mean_mel_specs, std_mel_specs, mean_deltas, std_deltas, mean_delta_deltas, std_delta_deltas = metadata
+    mean_mel_specs, std_mel_specs = metadata[:2]
+    mean_deltas, std_deltas = metadata[2:4]
+    mean_delta_deltas, std_delta_deltas = metadata[4:]
     # labels_segs_tot stores labels for each segment, while segs store number
     # of segments per utterance
-    data_tot, labels_tot, labels_segs_tot, segs = list(), list(), list(), list()
+    data_tot, labels_tot = list(), list()
+    labels_segs_tot, segs = list(), list()
 
     for wav_files, label_path in zip(wav_paths, lab_paths):
-        labels = dict() # to store labels of the current conversation
+        labels = dict()  # to store labels of the current conversation
         # Read labels
         with open(label_path, "r") as fin:
             for line in fin:
                 # If this line is sth like
-                # [6.2901 - 8.2357]	Ses01F_impro01_F000	neu	[2.5000, 2.5000, 2.5000]
+                # [6.2901 - 8.2357]	Ses01F_impro01_F000	neu	[2.5, 2.5, 2.5]
                 if line[0] == "[":
                     t = line.split()
                     # For e.g., {"Ses01F_impro01_F000": "neu", ...}
@@ -303,7 +314,8 @@ def extract_mel(dataset_dir, num_filters, emot_map, metadata,
                 train_sessions=TRAIN_SESSIONS, test_sessions=TEST_SESSIONS,
                 save_path=None, eps=1e-5):
     """
-    Adapted from https://github.com/xuanjihe/speech-emotion-recognition/blob/master/ExtractMel.py
+    Adapted from
+        https://github.com/xuanjihe/speech-emotion-recognition/blob/master/ExtractMel.py
 
     Read the entire IEMOCAP dataset and extract data from it.
 

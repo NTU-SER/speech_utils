@@ -26,24 +26,28 @@ def parse_arguments(argv):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('data_dir', type=str,
-        help='Path to the `IEMOCAP_full_release` directory..')
-    parser.add_argument('save_path', type=str,
-        help='Path to save the extracted data.')
+    parser.add_argument(
+        'data_dir', type=str,
+        help='Path to the `IEMOCAP_full_release` directory.')
+    parser.add_argument(
+        'save_path', type=str, help='Path to save the extracted data.')
 
-    parser.add_argument('--num_filters', type=int, default=40,
-        help='Number of mel filters.')
-    parser.add_argument('--train_sess', type=str, nargs="+",
+    parser.add_argument(
+        '--num_filters', type=int, default=40, help='Number of mel filters.')
+    parser.add_argument(
+        '--train_sess', type=str, nargs="+",
         default=["Session1", "Session2", "Session3", "Session4"],
         help='IEMOCAP sessions to use as training data. Passing multiple '
         'sessions is done by separating values by space.')
-    parser.add_argument('--test_sess', type=str, nargs="+", default=["Session5"],
+    parser.add_argument(
+        '--test_sess', type=str, nargs="+", default=["Session5"],
         help='IEMOCAP sessions to used as validation and test data. Note that '
         'recordings where the female actor is wearing the markers are used as '
         'validation data (e.g., `Ses01F_impro01`, where F indicates "female"),'
         ' while recordings where the male actor is wearing the markers are'
-        ' used as test data (e.g., `Ses01M_impro01`, where M indicates "male").'
-        ' Passing multiple sessions is done by separating values by space.')
+        ' used as test data (e.g., `Ses01M_impro01`, where M indicates '
+        '"male"). Passing multiple sessions is done by separating values by '
+        'space.')
 
     return parser.parse_args(argv)
 

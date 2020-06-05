@@ -80,9 +80,9 @@ class TestLoader(TrainLoader):
     Parameters
     ----------
     data : ndarray
-        Input data of shape `N x H x W x C`, where `N` is the number of examples
-        (segments), `H` is image height, `W` is image width and `C` is the
-        number of channels.
+        Input data of shape `N x H x W x C`, where `N` is the number of
+        examples (segments), `H` is image height, `W` is image width and `C`
+        is the number of channels.
     actual_target : ndarray
         Actual target labels (labels for utterances) of shape `(N',)`, where
         `N'` is the number of utterances.
