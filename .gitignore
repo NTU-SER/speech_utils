@@ -17,3 +17,6 @@ data
 
 # Archived files
 train_orig.py
+
+# Logs
+smile.log

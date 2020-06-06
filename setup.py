@@ -7,7 +7,8 @@ setup(
     author="Hoang Nghia Tuyen",
     author_email="hnt4499@gmail.com",
     url="https://github.com/NTU-SER/speech_utils",
-    install_requires=["numpy"],
+    install_requires=["numpy", "pandas", "python_speech_features", "wave",
+                      "tqdm", "joblib"],
     packages=find_packages(),
     include_package_data=True,
     package_data={
