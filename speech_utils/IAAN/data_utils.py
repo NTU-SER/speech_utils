@@ -645,7 +645,7 @@ def generate_interaction_data(order_dict, emo_dict, val_prefix=None,
     return df_train, df_val, df_test
 
 
-class InterationDataGenerator:
+class InteractionDataGenerator:
     """
     IEMOCAP interaction data generator, which returns a tuple of four arrays:
     center (the current utterances), target (previous utterance of the current
@@ -737,6 +737,9 @@ class InterationDataGenerator:
         return self
 
     def __next__(self):
+        if self.batch_idx >= self.num_batches:
+            raise StopIteration
+
         start_idx = self.batch_idx * self.batch_size
         end_idx = min(start_idx + self.batch_size, len(self))
         batch_size = end_idx - start_idx
