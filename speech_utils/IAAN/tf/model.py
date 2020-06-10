@@ -83,16 +83,19 @@ class IAAN:
 
             # Add masks
             seq_len = tf.shape(outputs)[1]
-            mask = get_mask(self.center_pl, self.num_gru_units)
 
+            target_mask = get_mask(self.target_pl, self.num_gru_units)
             target_att_masked = tf.tile(
                 tf.expand_dims(self.target_att, 1), [1, seq_len, 1])
-            target_att_masked = target_att_masked * mask
+            target_att_masked = target_att_masked * target_mask
+
+            opposite_mask = get_mask(self.opposite_pl, self.num_gru_units)
             opposite_att_masked = tf.tile(
                 tf.expand_dims(self.opposite_att, 1), [1, seq_len, 1])
-            opposite_att_masked = opposite_att_masked * mask
+            opposite_att_masked = opposite_att_masked * opposite_mask
 
-            self.out = outputs * mask
+            center_mask = get_mask(self.center_pl, self.num_gru_units)
+            self.out = outputs * center_mask
 
             # Compute context vector with Bahdanau attention
             with tf.variable_scope('interaction_aware_attention',
