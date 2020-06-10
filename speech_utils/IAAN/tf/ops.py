@@ -6,18 +6,18 @@ import numpy as np
 import tensorflow as tf
 
 
-def additive_attention(inputs_1, inputs_2, attention_size=16,
+def additive_attention(query, values, attention_size=16,
                        reuse=tf.AUTO_REUSE):
     """Additive attention layer between multiple inputs. For now, the
     TensorFlow version only supports 2 inputs.
 
     Parameters
     ----------
-    inputs_1 : tensor
-        Tensor of shape (B, T, D), where B is batch size, T is the sequence
-        length (along the time axis), and D is the features dimension.
-    inputs_2 : tensor
-        Same as inputs_1 (same shape as well).
+    query : tensor
+        Query tensor of shape (B, T, D), where B is batch size, T is the
+        sequence length (along the time axis), and D is the features dimension.
+    values : tensor
+        Same as query (same shape as well).
     attention_size : int
         Attention size. (default: 16)
     reuse
@@ -33,7 +33,7 @@ def additive_attention(inputs_1, inputs_2, attention_size=16,
     """
     with tf.variable_scope("additive_attention", reuse=reuse):
         # Hidden size of the RNN layer
-        hidden_size = int(inputs_1.shape[-1])
+        hidden_size = int(query.shape[-1])
 
         # Trainable parameters
         W1 = tf.Variable(
@@ -46,13 +46,13 @@ def additive_attention(inputs_1, inputs_2, attention_size=16,
 
         # Compute attention scores
         v = tf.nn.tanh(
-            tf.tensordot(inputs_1, W1, axes=1) +
-            tf.tensordot(inputs_2, W2, axes=1) + b
+            tf.tensordot(query, W1, axes=1) +
+            tf.tensordot(values, W2, axes=1) + b
         )  # (B, T, A)
         vu = tf.tensordot(v, u, axes=1)  # (B, T)
         alphas = tf.nn.softmax(vu)  # (B, T)
         # Output reduced with context vector
-        outputs = tf.reduce_sum(inputs_1 * tf.expand_dims(alphas, -1), 1)
+        outputs = tf.reduce_sum(query * tf.expand_dims(alphas, -1), 1)
 
     return outputs  # (B, D)
 
