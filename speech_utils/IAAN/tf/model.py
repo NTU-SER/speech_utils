@@ -3,13 +3,14 @@ import os
 import tensorflow as tf
 
 from .ops import (self_attention, get_mask, layer_norm_wrapper,
-                  label_smoothing)
+                  label_smoothing, class_balanced_loss)
 
 
 class IAAN:
     def __init__(self, save_dir, features_dim=45, num_gru_units=128,
                  attention_size=16, num_linear_units=64, lr=1e-4,
-                 weight_decay=1e-3, dropout_keep_prob=1.0, num_classes=4):
+                 weight_decay=1e-3, dropout_keep_prob=1.0, num_classes=4,
+                 loss_type="ce", samples_per_cls=None):
         # Cache data
         self.save_dir = save_dir
         self.features_dim = features_dim
@@ -20,6 +21,16 @@ class IAAN:
         self.weight_decay = weight_decay
         self.dropout_keep_prob = dropout_keep_prob
         self.num_classes = num_classes
+
+        # Loss
+        if loss_type not in ["ce", "cbl"]:
+            raise ValueError("Invalid loss type. Expect one of ['ce', 'cbl'], "
+                             "got '{}' instead.".format(loss_type))
+        if loss_type == "cbl" and samples_per_cls is None:
+            raise RuntimeError("Class balanced loss is used but the number of "
+                               "samples per class is not provided.")
+        self.loss_type = loss_type
+        self.samples_per_cls = samples_per_cls
 
         self._get_session()  # get session
         self._build_model()  # build model
@@ -153,8 +164,13 @@ class IAAN:
             self.gt = tf.one_hot(self.gt_pl, depth=self.num_classes)
             self.gt = label_smoothing(self.gt)
             # Classification loss
-            self.loss = tf.losses.softmax_cross_entropy(
-                onehot_labels=self.gt, logits=self.logits)
+            if self.loss_type == "ce":
+                self.loss = tf.losses.softmax_cross_entropy(
+                    onehot_labels=self.gt, logits=self.logits)
+            else:
+                self.loss = class_balanced_loss(
+                    labels=self.gt, logits=self.logits,
+                    samples_per_cls=self.samples_per_cls)
             # Total loss, including weight decay
             self.tot_loss = (self.loss + self.weight_decay *
                              (tf.nn.l2_loss(out_weight1) +

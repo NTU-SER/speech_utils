@@ -58,6 +58,12 @@ def main(args):
     test_loader = InteractionDataGenerator(
         df_test, args.batch_size, features_dict, sort_by_len=args.sort_by_len)
 
+    # Calculate number of samples per class for training data
+    uniques, samples_per_cls = np.unique(
+        train_loader.label, return_counts=True)
+    assert (uniques == range(len(uniques))).all()
+    assert samples_per_cls.sum() == len(train_loader)
+
     # Initialize model
     features_dim = list(features_dict.values())[0].shape[-1]
     model = IAAN(
@@ -65,7 +71,8 @@ def main(args):
         num_gru_units=args.num_gru_units, attention_size=args.attention_size,
         num_linear_units=args.num_linear_units, lr=args.lr,
         weight_decay=args.weight_decay,
-        dropout_keep_prob=args.keep_prob, num_classes=len(args.emo))
+        dropout_keep_prob=args.keep_prob, num_classes=len(args.emo),
+        loss_type=args.loss_type, samples_per_cls=samples_per_cls)
 
     # Train and evaluate
     best_ur = 0.0
@@ -137,6 +144,10 @@ def parse_arguments(argv):
         help='Scenes with this as prefix will be used as test data, '
              'e.g., "Ses01M".')
 
+    parser.add_argument(
+        '--loss_type', type=str, default="ce",
+        help='One of ["ce", "cbl"] (cross-entropy and class balanced loss, '
+             'respectively).')
     parser.add_argument(
         '--num_gru_units', type=int, default=128,
         help='Number of units in the GRU cells.')

@@ -226,3 +226,60 @@ def label_smoothing(inputs):
     K = inputs.get_shape().as_list()[-1]
     label = (0.9 * inputs) + (0.1 / K)
     return label
+
+
+def class_balanced_loss(labels, logits, samples_per_cls, beta=0.9999):
+    """
+    Reference: "Class-Balanced Loss Based on Effective Number of Samples"
+    Authors: Yin Cui and
+             Menglin Jia and
+             Tsung Yi Lin and
+             Yang Song and
+             Serge J. Belongie
+    https://arxiv.org/abs/1901.05555, CVPR'19.
+
+    Adapted from the PyTorch version:
+      https://github.com/vandit15/Class-balanced-loss-pytorch/blob/master/class_balanced_loss.py
+
+    Compute the Class Balanced Loss between `logits` and the ground truth
+    `labels`. Class Balanced Loss:
+        ((1 - beta) / (1 - beta^n)) * Loss(labels, logits)
+    where Loss is standard cross entropy loss.
+
+    Parameters
+    ----------
+    labels : tensor
+        A tensor of shape (batch_size, num_classes).
+    logits : tensor
+        A tensor of shape (batch_size, num_classes). Output probabilities of
+        the model.
+    samples_per_cls : list or ndarray
+        A list or ndarray of length `num_classes`.
+    beta : float
+        Hyperparameter for Class Balanced Loss.
+    is_training : bool
+
+    Returns
+    -------
+    loss : tensor
+        If training, return scalar reduced loss over non-zero weights.
+        Otherwise, return un-reduced loss (whose shape is (batch_size,)).
+
+    """
+    num_classes = labels.get_shape().as_list()[1]
+
+    effective_num = 1.0 - np.power(beta, samples_per_cls)
+    weights = (1.0 - beta) / np.array(effective_num)
+    weights = weights / np.sum(weights) * num_classes
+    weights = np.expand_dims(weights, 0).astype(np.float32)
+
+    weights = tf.multiply(weights, labels)
+    weights = tf.math.reduce_sum(weights, axis=1)
+    weights = tf.expand_dims(weights, axis=-1)
+
+    softmax = tf.nn.softmax(logits, axis=-1)
+
+    loss = tf.losses.log_loss(
+        labels=labels, predictions=softmax, weights=weights)
+
+    return loss

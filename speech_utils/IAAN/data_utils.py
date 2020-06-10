@@ -698,8 +698,8 @@ class InteractionDataGenerator:
         self._rearrange()
 
         # One-hot encoding
-        encoder = preprocessing.LabelEncoder()
-        self.label = encoder.fit_transform(self.df["center_label"])
+        self.encoder = preprocessing.LabelEncoder()
+        self.label = self.encoder.fit_transform(self.df["center_label"])
 
         # For compatibility
         self.features_dict[None] = np.zeros(shape=(0, self.features_dim))
