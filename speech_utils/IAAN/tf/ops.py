@@ -52,7 +52,7 @@ def additive_attention(query, values, attention_size=16,
         vu = tf.tensordot(v, u, axes=1)  # (B, T)
         alphas = tf.nn.softmax(vu)  # (B, T)
         # Output reduced with context vector
-        outputs = tf.reduce_sum(query * tf.expand_dims(alphas, -1), 1)
+        outputs = tf.reduce_sum(values * tf.expand_dims(alphas, -1), 1)
 
     return outputs  # (B, D)
 
@@ -142,7 +142,7 @@ def scaled_dot_product_attention(inputs, attention_size=64,
         # Mask the resulting tensor
         if masking:
             k_mask = get_mask(K)  # (B, T, T)
-            paddings = tf.ones_like(matmul_QK) * (-1e8)  # (B, T, T)
+            paddings = tf.ones_like(matmul_QK) * (1e-8)  # (B, T, T)
             matmul_QK = tf.where(
                 tf.equal(k_mask, 0), paddings, matmul_QK)  # (B, T, T)
 

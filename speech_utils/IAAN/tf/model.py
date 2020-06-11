@@ -124,7 +124,7 @@ class IAAN:
                 # Attention weights
                 mask_att = tf.sign(
                     tf.abs(tf.reduce_sum(self.center_pl, axis=-1)))
-                paddings = tf.ones_like(mask_att) * -1e8
+                paddings = tf.ones_like(mask_att) * 1e-8
 
                 vu = tf.where(tf.equal(mask_att, 0), paddings, vu)  # (B, T)
                 alphas = tf.nn.softmax(vu)
