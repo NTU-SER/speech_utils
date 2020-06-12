@@ -40,16 +40,18 @@ class IAAN:
 
         # Input placeholders
         with tf.variable_scope("input"):
-            # center: current utterance
+            # center: current utterance, shaped (B, T, D)
             self.center_pl = tf.placeholder(
                 dtype=tf.float32, shape=[None, None, self.features_dim])
-            # target: previous utterance of the current speaker
+            # target: previous utterance of the current speaker,
+            # shaped (B, T, D)
             self.target_pl = tf.placeholder(
                 dtype=tf.float32, shape=[None, None, self.features_dim])
-            # opposite: previous utterance of the interlocutor
+            # opposite: previous utterance of the interlocutor,
+            # shaped (B, T, D)
             self.opposite_pl = tf.placeholder(
                 dtype=tf.float32, shape=[None, None, self.features_dim])
-            # Labels
+            # Labels, shaped (B,)
             self.gt_pl = tf.placeholder(dtype=tf.int64, shape=[None])
 
             self.is_training_pl = tf.placeholder(tf.bool, name="is_training")
@@ -59,15 +61,15 @@ class IAAN:
         with tf.variable_scope('target_encoder', reuse=tf.AUTO_REUSE):
             cell = tf.contrib.rnn.GRUCell(self.num_gru_units)
             outputs, _ = tf.nn.dynamic_rnn(
-                cell, inputs=self.target_pl, dtype=tf.float32)
-            self.target_att = self_attention(outputs)
+                cell, inputs=self.target_pl, dtype=tf.float32)  # (B, T, H)
+            self.target_att = self_attention(outputs)  # (B, H)
 
         # Opposite features encoder
         with tf.variable_scope('opposite_encoder', reuse=tf.AUTO_REUSE):
             cell = tf.contrib.rnn.GRUCell(self.num_gru_units)
             outputs, _ = tf.nn.dynamic_rnn(
-                cell, inputs=self.opposite_pl, dtype=tf.float32)
-            self.opposite_att = self_attention(outputs)
+                cell, inputs=self.opposite_pl, dtype=tf.float32)  # (B, T, H)
+            self.opposite_att = self_attention(outputs)  # (B, H)
 
         # Center features encoder
         with tf.variable_scope('center_encoder', reuse=tf.AUTO_REUSE):
@@ -79,23 +81,28 @@ class IAAN:
 
             outputs, _ = tf.nn.dynamic_rnn(
                 cell, inputs=self.center_pl, dtype=tf.float32,
-                time_major=False)
+                time_major=False)  # (B, T, H)
 
             # Add masks
-            seq_len = tf.shape(outputs)[1]
+            seq_len = tf.shape(outputs)[1]  # T
 
-            target_mask = get_mask(self.target_pl, self.num_gru_units)
+            target_mask = get_mask(
+                self.target_pl, self.num_gru_units)  # (B, T, H)
             target_att_masked = tf.tile(
-                tf.expand_dims(self.target_att, 1), [1, seq_len, 1])
+                tf.expand_dims(self.target_att, 1),
+                [1, seq_len, 1])  # (B, T, H)
             target_att_masked = target_att_masked * target_mask
 
-            opposite_mask = get_mask(self.opposite_pl, self.num_gru_units)
+            opposite_mask = get_mask(
+                self.opposite_pl, self.num_gru_units)  # (B, T, H)
             opposite_att_masked = tf.tile(
-                tf.expand_dims(self.opposite_att, 1), [1, seq_len, 1])
+                tf.expand_dims(self.opposite_att, 1),
+                [1, seq_len, 1])  # (B, T, H)
             opposite_att_masked = opposite_att_masked * opposite_mask
 
-            center_mask = get_mask(self.center_pl, self.num_gru_units)
-            self.out = outputs * center_mask
+            center_mask = get_mask(
+                self.center_pl, self.num_gru_units)  # (B, T, H)
+            self.out = outputs * center_mask  # (B, T, H)
 
             # Compute context vector with Bahdanau attention
             with tf.variable_scope('interaction_aware_attention',
@@ -118,24 +125,24 @@ class IAAN:
                     tf.tensordot(self.out, W_c, axes=1) +
                     tf.tensordot(target_att_masked, W_p, axes=1) +
                     tf.tensordot(opposite_att_masked, W_r, axes=1) + b
-                )
-                vu = tf.tensordot(v, u, axes=1)
+                )  # (B, T, A)
+                vu = tf.tensordot(v, u, axes=1)  # (B, T)
 
                 # Attention weights
                 mask_att = tf.sign(
-                    tf.abs(tf.reduce_sum(self.center_pl, axis=-1)))
-                paddings = tf.ones_like(mask_att) * 1e-8
+                    tf.abs(tf.reduce_sum(self.center_pl, axis=-1)))  # (B, T)
+                paddings = tf.ones_like(mask_att) * 1e-8  # (B, T)
 
                 vu = tf.where(tf.equal(mask_att, 0), paddings, vu)  # (B, T)
-                alphas = tf.nn.softmax(vu)
+                alphas = tf.nn.softmax(vu)  # (B, T)
 
-                # Output reduced with context vector: (B, T)
+                # Output reduced with context vector
                 self.center_att = tf.reduce_sum(
-                    self.out * tf.expand_dims(alphas, -1), 1)
+                    self.out * tf.expand_dims(alphas, -1), 1)  # (B, T)
 
         # Multi-layer perceptron
         with tf.variable_scope('mlp', reuse=tf.AUTO_REUSE):
-            self.out = tf.concat(
+            self.out = tf.concat(  # (B, T * 3)
                 [self.center_att, self.target_att, self.opposite_att], 1)
             # FCN 1 parameters
             out_weight1 = tf.get_variable(
@@ -154,13 +161,13 @@ class IAAN:
                 'out_bias2', shape=[self.num_classes], dtype=tf.float32,
                 initializer=tf.constant_initializer(0.1))
             # FC ops
-            dense = tf.matmul(self.out, out_weight1) + out_bias1
+            dense = tf.matmul(self.out, out_weight1) + out_bias1  # (B, L)
             dense = layer_norm_wrapper(
-                dense, self.keep_prob_pl)
-            dense = tf.nn.relu(dense)
-            dense = tf.matmul(dense, out_weight2) + out_bias2
+                dense, self.keep_prob_pl)  # (B, L)
+            dense = tf.nn.relu(dense)  # (B, L)
+            dense = tf.matmul(dense, out_weight2) + out_bias2  # (B, C)
 
-            self.logits = dense
+            self.logits = dense  # (B, C)
 
         with tf.variable_scope('loss', reuse=tf.AUTO_REUSE):
             # Label smoothing
