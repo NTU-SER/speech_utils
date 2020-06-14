@@ -11,6 +11,7 @@
 # Checkpoints
 **/checkpoint
 *.ckpt*
+*.pth
 
 # Data
 data
