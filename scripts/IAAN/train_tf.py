@@ -28,7 +28,7 @@ def evaluate(model, dataloader, epoch_idx, phase="val"):
     tot_labels = np.concatenate(tot_labels)
     tot_preds = np.concatenate(tot_preds)
 
-    tot_loss /= len(dataloader)
+    tot_loss /= dataloader.num_samples
     tot_acc = accuracy_score(tot_labels, tot_preds)
     tot_ur = recall_score(tot_labels, tot_preds, average="macro")
     tot_cm = confusion_matrix(tot_labels, tot_preds)

@@ -691,6 +691,7 @@ class InteractionDataGenerator:
         self.features_dim = list(features_dict.values())[0].shape[1]
 
         # Iterator
+        self.num_samples = len(df)
         self.batch_size = batch_size
         self.num_batches = math.ceil(len(df) / batch_size)
 
@@ -741,7 +742,7 @@ class InteractionDataGenerator:
             raise StopIteration
 
         start_idx = self.batch_idx * self.batch_size
-        end_idx = min(start_idx + self.batch_size, len(self))
+        end_idx = min(start_idx + self.batch_size, self.num_samples)
         batch_size = end_idx - start_idx
 
         # Initialize
@@ -783,4 +784,4 @@ class InteractionDataGenerator:
         return center_features, target_features, opposite_features, labels
 
     def __len__(self):
-        return len(self.df)
+        return self.num_batches
