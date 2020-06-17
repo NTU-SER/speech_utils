@@ -15,13 +15,13 @@ def read_wave_from_file(filepath):
 
     Returns
     -------
-    wave_data: ndarray
+    wave_data : ndarray
         An array of shape (num_frames * 2,) representing the wave data
         extracted from the *.wav file.
-    ticks: ndarray
+    ticks : ndarray
         An array of shape (num_frames,) representing ticks in the audio
         sequence.
-    frame_rate: int
+    frame_rate : int
         Number of frames per second.
 
     """
